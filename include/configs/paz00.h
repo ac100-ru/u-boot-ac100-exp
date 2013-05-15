@@ -72,6 +72,14 @@
 #define CONFIG_SYS_WHITE_ON_BLACK
 #define CONFIG_CONSOLE_SCROLL_LINES	10
 
+/* Keyboard support */
+#define CONFIG_KEYBOARD
+#define CONFIG_TEGRA_NVEC_KEYBOARD
+/* NVEC support */
+#define CONFIG_TEGRA_I2C 1
+#define CONFIG_SYS_I2C_INIT_BOARD 1
+#define CONFIG_TEGRA_NVEC 1
+
 #include "tegra-common-post.h"
 
 #endif /* __CONFIG_H */
