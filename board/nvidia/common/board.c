@@ -40,6 +40,9 @@
 #include <i2c.h>
 #include <spi.h>
 #include "emc.h"
+#ifdef CONFIG_TEGRA_NVEC
+#include "nvec.h"
+#endif
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -171,6 +174,8 @@ int board_init(void)
 	warmboot_prepare_code(TEGRA_LP0_ADDR, TEGRA_LP0_SIZE);
 #endif
 
+	printf("nVidia board init done.");
+
 	return 0;
 }
 
@@ -201,10 +206,19 @@ int board_early_init_f(void)
 
 int board_late_init(void)
 {
+	__maybe_unused int err;
+
 #ifdef CONFIG_LCD
 	/* Make sure we finish initing the LCD */
 	tegra_lcd_check_next_stage(gd->fdt_blob, 1);
 #endif
+
+#ifdef CONFIG_TEGRA_NVEC
+	err = board_nvec_init();
+	if (err)
+		debug("NVEC controller init failed: %d\n", err);
+#endif
+
 	return 0;
 }
 
