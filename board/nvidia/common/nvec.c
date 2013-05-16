@@ -596,7 +596,7 @@ int board_nvec_init(void)
 		dbg_i = -1;
 		msg_i = -1;
 		key_i = -1;
-		udelay(100);
+		mdelay(20);
 	}
 
 	return 1;
