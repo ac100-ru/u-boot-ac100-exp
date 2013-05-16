@@ -612,7 +612,7 @@ void nvec_enable_kbd_events(void)
 	/* FIXME Sometimes wake faild first time (maybe already fixed).
 	 * Need to check
 	 */
-	if (res = nvec_do_request(cnfg_wake, 4)) {
+	if ((res = nvec_do_request(cnfg_wake, 4))) {
 		printf("NVEC: wake reuqest were not configured (%d), retry\n", res);
 		if (nvec_do_request(cnfg_wake, 4))
 			printf("NVEC: wake reuqest were not configured (%d)\n", res);
@@ -705,7 +705,7 @@ static void nvec_configure_event(long mask, int state)
 	buf[6] = (mask >> 8) & 0xff;
 
 	if (nvec_do_request(buf, 7))
-		printf("NVEC: failed to configure event (mask 0x%0x, state %d)\n",
+		printf("NVEC: failed to configure event (mask 0x%0lx, state %d)\n",
 													mask, state);
 };
 
