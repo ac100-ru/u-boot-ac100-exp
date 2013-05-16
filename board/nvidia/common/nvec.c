@@ -650,8 +650,9 @@ void nvec_enable_kbd_events(void)
 int nvec_read_events(void)
 {
 	int res;
+	int cnt = 0;
 
-	while (1) {
+	while (++cnt <= 8) {
 		dbg_i = -1;
 		msg_i = -1;
 		res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
