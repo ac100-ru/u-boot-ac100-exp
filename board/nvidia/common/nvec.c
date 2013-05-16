@@ -561,11 +561,7 @@ int board_nvec_init(void)
 
 	printf("NVEC is initialized\n");
 
-	printf("%s: NVEC dummy io\n", __func__);
 	res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
-	printf("%s: NVEC dummy io res:%d\n", __func__, res);
-
-	printf("%s: NVEC noop write\n", __func__);
 	nvec_do_request(noop, 2);
 
 	nvec_toggle_global_events(1);
@@ -578,7 +574,10 @@ int board_nvec_init(void)
 
 	nvec_enable_kbd_events();
 
-	dbg_print();
+	/*dbg_print();*/
+	dbg_i = -1;
+	msg_i = -1;
+	key_i = -1;
 
 	/*
 	while (1) {
