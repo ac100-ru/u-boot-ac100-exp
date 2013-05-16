@@ -619,6 +619,7 @@ void nvec_enable_kbd_events(void)
 	 */
 	if ((res = nvec_do_request(cnfg_wake, 4))) {
 		printf("NVEC: wake reuqest were not configured (%d), retry\n", res);
+		dbg_save(0xff, 0xff);
 		if (nvec_do_request(cnfg_wake, 4))
 			printf("NVEC: wake reuqest were not configured (%d)\n", res);
 	}
