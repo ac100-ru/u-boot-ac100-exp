@@ -554,11 +554,11 @@ int board_nvec_init(void)
 
 	printf("NVEC is initialized\n");
 
-	printf("!!! %s: NVEC dummy io\n", __func__);
+	printf("%s: NVEC dummy io\n", __func__);
 	res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
-	printf("!!! %s: NVEC dummy io res:%d\n", __func__, res);
+	printf("%s: NVEC dummy io res:%d\n", __func__, res);
 
-	printf("!!! %s: NVEC noop write\n", __func__);
+	printf("%s: NVEC noop write\n", __func__);
 	nvec_do_request(noop, 2);
 
 	nvec_toggle_global_events(1);
@@ -586,38 +586,41 @@ int board_nvec_init(void)
 
 void nvec_enable_kbd_events(void)
 {
-	printf("!!! %s: NVEC\n", __func__);
+	// TODO Remove mdelays ?
+
 	/* Enable keyboard */
-	nvec_do_request(enable_kbd, 2);
-	printf("!!! %s: kbd on\n", __func__);
+	if (nvec_do_request(enable_kbd, 2))
+		printf("NVEC: failed to enable keyboard\n");
 	mdelay(NVEC_TIMEOUT_MIN);
 
 	/* FIXME Sometimes wake faild first time (maybe already fixed).
 	 * Need to check
 	 */
-	if (nvec_do_request(cnfg_wake, 4) == 0)
-		printf("!!! %s: wake on\n", __func__);
-	else {
-		printf("!!! %s: wake failed\n", __func__);
-		if (nvec_do_request(cnfg_wake, 4) == 0)
-			printf("!!! %s: wake on\n", __func__);
-		else
-			printf("!!! %s: wake failed\n", __func__);
+	if (nvec_do_request(cnfg_wake, 4)) {
+		printf("NVEC: wake reuqest were not configured, retry\n");
+		if (nvec_do_request(cnfg_wake, 4))
+			printf("NVEC: wake reuqest were not configured\n");
 	}
 	mdelay(NVEC_TIMEOUT_MIN);
 
 	/* keyboard needs reset via mouse command */
-	nvec_do_request(reset_kbd, 4);
+	if (nvec_do_request(reset_kbd, 4))
+		printf("NVEC: failed to reset keyboard\n");
 	mdelay(NVEC_TIMEOUT_MIN);
 
-	nvec_do_request(cnfg_wake_key_reporting, 3);
-	printf("!!! %s: wake key reporing on on\n", __func__);
+	if (nvec_do_request(cnfg_wake_key_reporting, 3))
+		printf("NVEC: failed to configure waky key reporting\n");
+	mdelay(NVEC_TIMEOUT_MIN);
 
-	nvec_do_request(clear_leds, 3);
+	if (nvec_do_request(clear_leds, 3))
+		printf("NVEC: failed to clear leds\n");
+	mdelay(NVEC_TIMEOUT_MIN);
 
 	/* Disable caps lock LED */
 	/*nvec_do_request(clear_leds, sizeof(clear_leds));
 	nvec_do_io(&nvec_data);*/
+
+	printf("NVEC: keyboard initialization finished\n");
 }
 
 
@@ -684,12 +687,15 @@ static void nvec_configure_event(long mask, int state)
 	buf[5] = (mask >> 0) & 0xff;
 	buf[6] = (mask >> 8) & 0xff;
 
-	nvec_do_request(buf, 7);
+	if (nvec_do_request(buf, 7))
+		printf("NVEC: failed to configure event (mask 0x%0x, state %d)\n",
+													mask, state);
 };
 
 static void nvec_toggle_global_events(int state)
 {
 	char global_events[] = { NVEC_SLEEP, GLOBAL_EVENTS, state };
 
-	nvec_do_request(global_events, 3);
+	if (nvec_do_request(global_events, 3))
+		printf("NVEC: failed to enable global events\n");
 }
