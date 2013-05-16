@@ -588,6 +588,7 @@ int board_nvec_init(void)
 				printf("dbg_i: %d, msg_i: %d, key_i: %d\n", dbg_i, msg_i, key_i);
 				dbg_print();
 				msg_print();
+				nvec_do_request(noop, 2);
 			}
 		}
 		while (nvec_have_keys())
