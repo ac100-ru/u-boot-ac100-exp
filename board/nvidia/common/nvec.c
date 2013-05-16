@@ -598,6 +598,8 @@ int board_nvec_init(void)
 
 void nvec_enable_kbd_events(void)
 {
+	int res;
+
 	// TODO Remove mdelays ?
 
 	/* Enable keyboard */
@@ -608,10 +610,10 @@ void nvec_enable_kbd_events(void)
 	/* FIXME Sometimes wake faild first time (maybe already fixed).
 	 * Need to check
 	 */
-	if (nvec_do_request(cnfg_wake, 4)) {
-		printf("NVEC: wake reuqest were not configured, retry\n");
+	if (res = nvec_do_request(cnfg_wake, 4)) {
+		printf("NVEC: wake reuqest were not configured (%d), retry\n", res);
 		if (nvec_do_request(cnfg_wake, 4))
-			printf("NVEC: wake reuqest were not configured\n");
+			printf("NVEC: wake reuqest were not configured (%d)\n", res);
 	}
 	mdelay(NVEC_TIMEOUT_MIN);
 
