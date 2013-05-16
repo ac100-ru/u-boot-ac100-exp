@@ -28,19 +28,12 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-/* Nvec perfroms io interval is beteween 20 and 500 ms,
-   no response in 600 ms means error */
-const unsigned int NVEC_TIMEOUT_MIN = 20;
-const unsigned int NVEC_TIMEOUT_MAX = 600;
-const int NVEC_WAIT_FOR_EC = 1;
-const int NVEC_DONT_WAIT_FOR_EC = 0;
 
 int debug = 0;
 struct dbg_t {
 	unsigned long status;
 	unsigned int data;
 };
-
 
 static struct dbg_t dbg[256];
 static int dbg_i = -1;
@@ -51,7 +44,6 @@ static inline void dbg_save(unsigned long status, unsigned int data)
 	dbg[dbg_i].status = status;
 	dbg[dbg_i].data = data;
 }
-
 
 static inline void dbg_print(void)
 {
@@ -70,6 +62,14 @@ static inline void dbg_print(void)
 #undef AS_BOOL
 	dbg_i = -1;
 }
+
+
+/* Nvec perfroms io interval is beteween 20 and 500 ms,
+no response in 600 ms means error */
+const unsigned int NVEC_TIMEOUT_MIN = 20;
+const unsigned int NVEC_TIMEOUT_MAX = 600;
+const int NVEC_WAIT_FOR_EC = 1;
+const int NVEC_DONT_WAIT_FOR_EC = 0;
 
 enum {
 	nvec_io_error = -1,
@@ -166,12 +166,6 @@ char noop[] = { NVEC_CNTL, CNTL_NOOP };
 char get_firmware_version[] = { NVEC_CNTL, CNTL_GET_FIRMWARE_VERSION };
 
 
-static int nvec_is_event(struct nvec_t* nvec)
-{
-	return nvec->rx_buf[0] >> 7;
-}
-
-
 struct key_t {
 	int code;
 	int state;
@@ -207,6 +201,11 @@ void msg_print(void)
 	for (i = 0; i <= msg_i; ++i)
 		printf("msg: 0x%04x\n", msg[i]);
 	msg_i = -1;
+}
+
+static int nvec_is_event(struct nvec_t* nvec)
+{
+	return nvec->rx_buf[0] >> 7;
 }
 
 void nvec_process_msg(struct nvec_t* nvec)
@@ -473,9 +472,6 @@ int nvec_do_request(char* buf, int size)
 	return 0;
 }
 
-static void nvec_configure_event(long mask, int state);
-static void nvec_toggle_global_events(int state);
-
 /**
  * Decode the nvec information from the fdt.
  *
@@ -513,6 +509,9 @@ static int nvec_decode_config(const void *blob,
 	return 0;
 }
 
+static void nvec_configure_event(long mask, int state);
+static void nvec_toggle_global_events(int state);
+
 int board_nvec_init(void)
 {
 	int res = 0;
@@ -534,7 +533,7 @@ int board_nvec_init(void)
 	nvec_data.i2c_clk = cfg.i2c_clk; // 80000; /* */
 	nvec_data.base = (void __iomem *)cfg.base_addr; //0x7000c500;
 
-	printf("!!! %s: NVEC init...\n", __func__);
+	printf("NVEC initialization...\n");
 
 	res = gpio_request(nvec_data.gpio, NULL);
 	if (res != 0)
@@ -553,7 +552,7 @@ int board_nvec_init(void)
 	/* get firmware */
 	/* enable keyboard */
 
-	printf("!!! %s: NVEC initialized\n", __func__);
+	printf("NVEC is initialized\n");
 
 	printf("!!! %s: NVEC dummy io\n", __func__);
 	res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
@@ -591,7 +590,8 @@ void nvec_enable_kbd_events(void)
 	/* Enable keyboard */
 	nvec_do_request(enable_kbd, 2);
 	printf("!!! %s: kbd on\n", __func__);
-	//udelay(100000);
+	mdelay(NVEC_TIMEOUT_MIN);
+
 	/* FIXME Sometimes wake faild first time (maybe already fixed).
 	 * Need to check
 	 */
@@ -614,19 +614,10 @@ void nvec_enable_kbd_events(void)
 	printf("!!! %s: wake key reporing on on\n", __func__);
 
 	nvec_do_request(clear_leds, 3);
-#if 0
-	/* configures wake on special keys */
-	nvec_do_request(nvec, cnfg_wake, 4);
-	nvec_do_io(&nvec_data);
-	/* enable wake key reporting */
-	nvec_do_request(cnfg_wake_key_reporting, 3);
-	nvec_do_io(&nvec_data);
-#endif
 
 	/* Disable caps lock LED */
 	/*nvec_do_request(clear_leds, sizeof(clear_leds));
 	nvec_do_io(&nvec_data);*/
-
 }
 
 
