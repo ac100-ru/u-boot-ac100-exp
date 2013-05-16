@@ -430,7 +430,8 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 			return;
 		}*/
 		if (status & END_TRANS) {
-			printf("%s: NVEC: unknown operation ended\n", __func__);
+			printf("%s: NVEC: unknown operation ended (status:0x%x, state:%d)\n", __func__,
+					status, nvec->state);
 			return nvec_io_error;
 		}
 	}
