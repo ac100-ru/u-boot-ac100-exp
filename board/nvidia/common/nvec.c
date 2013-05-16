@@ -423,7 +423,7 @@ int nvec_do_io(struct nvec_t* nvec, unsigned int timeout_ms)
 		printf("%s: NVEC:\n", __func__);
 }
 
-int nvec_write(char* buf, int size)
+int nvec_do_request(char* buf, int size)
 {
 	int res = 0;
 	int limit = 10;
@@ -559,10 +559,10 @@ int board_nvec_init(void)
 	printf("!!! %s: NVEC dummy io res:%d\n", __func__, res);
 
 	printf("!!! %s: NVEC noop write\n", __func__);
-	nvec_write(noop, 2);
+	nvec_do_request(noop, 2);
 
 	nvec_toggle_global_events(1);
-	nvec_write(get_firmware_version, 2);
+	nvec_do_request(get_firmware_version, 2);
 
 	/* LID */
 	nvec_configure_event(0x02, 1);
@@ -588,17 +588,17 @@ void nvec_enable_kbd_events(void)
 {
 	printf("!!! %s: NVEC\n", __func__);
 	/* Enable keyboard */
-	nvec_write(enable_kbd, 2);
+	nvec_do_request(enable_kbd, 2);
 	printf("!!! %s: kbd on\n", __func__);
 	//udelay(100000);
 	/* FIXME Sometimes wake faild first time (maybe already fixed).
 	 * Need to check
 	 */
-	if (nvec_write(cnfg_wake, 4) == 0)
+	if (nvec_do_request(cnfg_wake, 4) == 0)
 		printf("!!! %s: wake on\n", __func__);
 	else {
 		printf("!!! %s: wake failed\n", __func__);
-		if (nvec_write(cnfg_wake, 4) == 0)
+		if (nvec_do_request(cnfg_wake, 4) == 0)
 			printf("!!! %s: wake on\n", __func__);
 		else
 			printf("!!! %s: wake failed\n", __func__);
@@ -606,24 +606,24 @@ void nvec_enable_kbd_events(void)
 	mdelay(20);
 
 	/* keyboard needs reset via mouse command */
-	nvec_write(reset_kbd, 4);
+	nvec_do_request(reset_kbd, 4);
 	mdelay(20);
 
-	nvec_write(cnfg_wake_key_reporting, 3);
+	nvec_do_request(cnfg_wake_key_reporting, 3);
 	printf("!!! %s: wake key reporing on on\n", __func__);
 
-	nvec_write(clear_leds, 3);
+	nvec_do_request(clear_leds, 3);
 #if 0
 	/* configures wake on special keys */
-	nvec_write(nvec, cnfg_wake, 4);
+	nvec_do_request(nvec, cnfg_wake, 4);
 	nvec_do_io(&nvec_data);
 	/* enable wake key reporting */
-	nvec_write(cnfg_wake_key_reporting, 3);
+	nvec_do_request(cnfg_wake_key_reporting, 3);
 	nvec_do_io(&nvec_data);
 #endif
 
 	/* Disable caps lock LED */
-	/*nvec_write(clear_leds, sizeof(clear_leds));
+	/*nvec_do_request(clear_leds, sizeof(clear_leds));
 	nvec_do_io(&nvec_data);*/
 
 }
@@ -680,12 +680,12 @@ static void nvec_configure_event(long mask, int state)
 	buf[5] = (mask >> 0) & 0xff;
 	buf[6] = (mask >> 8) & 0xff;
 
-	nvec_write(buf, 7);
+	nvec_do_request(buf, 7);
 };
 
 static void nvec_toggle_global_events(int state)
 {
 	char global_events[] = { NVEC_SLEEP, GLOBAL_EVENTS, state };
 
-	nvec_write(global_events, 3);
+	nvec_do_request(global_events, 3);
 }
