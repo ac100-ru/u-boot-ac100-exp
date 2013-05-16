@@ -582,10 +582,14 @@ int board_nvec_init(void)
 
 	while (1) {
 		res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
-		if (res != nvec_io_not_ready)
+		if (res != nvec_io_not_ready) {
 			printf("io result %d\n", res);
-		/*dbg_print();
-		msg_print();*/
+			if (res == nvec_io_timeout) {
+				printf("dbg_i: %d, msg_i: %d, key_i: %d\n", dbg_i, msg_i, key_i);
+				dbg_print();
+				msg_print();
+			}
+		}
 		while (nvec_have_keys())
 			printf("%d ", nvec_pop_key());
 		dbg_i = -1;
