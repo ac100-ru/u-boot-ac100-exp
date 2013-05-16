@@ -578,7 +578,7 @@ int board_nvec_init(void)
 
 	while (1) {
 		res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
-		if (res != nvec_io_read_ok)
+		if (res != nvec_io_read_ok && res != nvec_io_not_ready)
 			printf("io error %d\n", res);
 		dbg_print();
 		msg_print();
