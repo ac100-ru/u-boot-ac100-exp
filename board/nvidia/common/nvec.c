@@ -287,6 +287,7 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 	unsigned int received = 0;
 	unsigned int to_send = 0;
 	unsigned int timeout_ms = NVEC_TIMEOUT_MAX;
+	unsigned int old_state;
 	int is_first_iteration = 1;
 
 	poll_start_ms = get_timer(0);
@@ -337,6 +338,7 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 		}
 		*/
 
+		old_state = nvec->state;
 		switch (nvec->state) {
 			case NVST_BEGIN:
 				nvec->rx_pos = 0;
@@ -430,8 +432,8 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 			return;
 		}*/
 		if (status & END_TRANS) {
-			printf("%s: NVEC: unknown operation ended (status:0x%x, state:%d)\n", __func__,
-					status, nvec->state);
+			printf("%s: NVEC: unknown operation ended (status:0x%x, state:%d, old state:%d)\n", __func__,
+					status, nvec->state, old_state);
 			return nvec_io_error;
 		}
 	}
