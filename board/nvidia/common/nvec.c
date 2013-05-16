@@ -80,6 +80,7 @@ enum {
 	nvec_io_read_ok,
 	nvec_io_write_ok,
 	nvec_io_not_ready,
+	nvec_io_retry,
 };
 
 enum {
@@ -432,9 +433,9 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 			return;
 		}*/
 		if (status & END_TRANS) {
-			printf("%s: NVEC: unknown operation ended (status:0x%x, state:%d, old state:%d)\n", __func__,
-					status, nvec->state, old_state);
-			return nvec_io_error;
+			/*printf("%s: NVEC: unknown operation ended (status:0x%x, state:%d, old state:%d)\n", __func__,
+					status, nvec->state, old_state);*/
+			return nvec_io_retry;
 		}
 	}
 #undef AS_BOOL
@@ -648,6 +649,7 @@ int nvec_read_events(void)
 				return 0;
 
 			case nvec_io_read_ok:
+			case nvec_io_retry:
 				udelay(100);
 				break;
 
