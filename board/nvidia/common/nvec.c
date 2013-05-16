@@ -47,6 +47,9 @@ static inline void dbg_save(unsigned long status, unsigned int data)
 
 static inline void dbg_print(void)
 {
+	if (dbg_i == -1)
+		return;
+
 #define AS_BOOL(x) ((int)((x) == 0 ? 0 : 1))
 	int i = 0;
 	for (i = 0; i <= dbg_i; ++i) {
@@ -573,12 +576,11 @@ int board_nvec_init(void)
 
 	dbg_print();
 
-	/*
 	while (1) {
-		nvec_do_io(&nvec_data, 100);
+		nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
 		dbg_print();
+		udelay(100);
 	}
-	*/
 
 	return 1;
 }
