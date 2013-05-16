@@ -28,6 +28,13 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+/* Nvec perfroms io interval is beteween 20 and 500 ms,
+   no response in 600 ms means error */
+const unsigned int NVEC_TIMEOUT_MIN = 20;
+const unsigned int NVEC_TIMEOUT_MAX = 600;
+const int NVEC_WAIT_FOR_EC = 1;
+const int NVEC_DONT_WAIT_FOR_EC = 0;
+
 int debug = 0;
 struct dbg_t {
 	unsigned long status;
@@ -69,6 +76,7 @@ enum {
 	nvec_io_timeout,
 	nvec_io_read_ok,
 	nvec_io_write_ok,
+	nvec_io_not_ready,
 };
 
 enum {
@@ -270,12 +278,14 @@ static inline int is_ready(unsigned long status)
 }
 
 
-int nvec_do_io(struct nvec_t* nvec, unsigned int timeout_ms)
+int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 {
 	unsigned int poll_start_ms = 0;
 	unsigned long status;
 	unsigned int received = 0;
 	unsigned int to_send = 0;
+	unsigned int timeout_ms = NVEC_TIMEOUT_MAX;
+	int is_first_iteration = 1;
 
 	poll_start_ms = get_timer(0);
 
@@ -283,12 +293,18 @@ int nvec_do_io(struct nvec_t* nvec, unsigned int timeout_ms)
 	while (1) {
 		status = readl(nvec->base + I2C_SL_STATUS);
 		if (!is_ready(status)) {
+			if (is_first_iteration && !wait_for_ec)
+				return nvec_io_not_ready;
+
 			if (get_timer(poll_start_ms) > timeout_ms) {
 				return nvec_io_timeout;
 			}
+
+			is_first_iteration = 0;
 			udelay(100);
 			continue;
 		}
+		is_first_iteration = 0;
 
 		if (debug)
 			printf("NVEC: status: 0x%lx\n", status);
@@ -426,7 +442,6 @@ int nvec_do_io(struct nvec_t* nvec, unsigned int timeout_ms)
 int nvec_do_request(char* buf, int size)
 {
 	int res = 0;
-	int limit = 10;
 	/*int i = 0;*/
 
 	nvec_data.tx_buf = buf;
@@ -437,32 +452,18 @@ int nvec_do_request(char* buf, int size)
 		printf("\\x%02x", buf[i]);
 	printf("\n");*/
 
-	while (1) {
-		gpio_set_value(nvec_data.gpio, 0);
-		mdelay(20);
-		res = nvec_do_io(&nvec_data, 500);
-		if (res != nvec_io_write_ok) {
-			--limit;
-		}
-		if (res == nvec_io_write_ok)
-			break;
-		if (limit == 0) {
-			printf("nwec_write failed to send request\n");
-			return -1;
-		}
+	gpio_set_value(nvec_data.gpio, 0);
+	mdelay(NVEC_TIMEOUT_MIN);
+	res = nvec_do_io(&nvec_data, NVEC_WAIT_FOR_EC);
+	if (res != nvec_io_write_ok) {
+		printf("nwec_write failed to send request\n");
+		return -1;
 	}
-	mdelay(20);
-	limit = 10;
-	while (1) {
-		res = nvec_do_io(&nvec_data, 500);
-		if (res != nvec_io_read_ok)
-			--limit;
-		if (res == nvec_io_read_ok)
-			break;
-		if (res == nvec_io_error || limit == 0) {
-			printf("nwec_write failed to read response\n");
-			return -1;
-		}
+	mdelay(NVEC_TIMEOUT_MIN);
+	res = nvec_do_io(&nvec_data, NVEC_WAIT_FOR_EC);
+	if (res != nvec_io_read_ok) {
+		printf("nwec_write failed to read response\n");
+		return -1;
 	}
 
 	nvec_data.tx_buf = 0;
@@ -554,8 +555,8 @@ int board_nvec_init(void)
 
 	printf("!!! %s: NVEC initialized\n", __func__);
 
-	printf("!!! %s: NVEC dump io\n", __func__);
-	res = nvec_do_io(&nvec_data, 300);
+	printf("!!! %s: NVEC dummy io\n", __func__);
+	res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
 	printf("!!! %s: NVEC dummy io res:%d\n", __func__, res);
 
 	printf("!!! %s: NVEC noop write\n", __func__);
@@ -603,11 +604,11 @@ void nvec_enable_kbd_events(void)
 		else
 			printf("!!! %s: wake failed\n", __func__);
 	}
-	mdelay(20);
+	mdelay(NVEC_TIMEOUT_MIN);
 
 	/* keyboard needs reset via mouse command */
 	nvec_do_request(reset_kbd, 4);
-	mdelay(20);
+	mdelay(NVEC_TIMEOUT_MIN);
 
 	nvec_do_request(cnfg_wake_key_reporting, 3);
 	printf("!!! %s: wake key reporing on on\n", __func__);
@@ -636,13 +637,25 @@ int nvec_read_events(void)
 	while (1) {
 		dbg_i = -1;
 		msg_i = -1;
-		res = nvec_do_io(&nvec_data, 30);
-		if (dbg_i == -1)
-			return 0;
-		
-		if (res == nvec_io_error)
-			dbg_print();
-		udelay(100);
+		res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
+		switch (res) {
+			case nvec_io_not_ready:
+				return 0;
+
+			case nvec_io_read_ok:
+				udelay(100);
+				break;
+
+			case nvec_io_error:
+			case nvec_io_timeout:
+				dbg_print();
+				return 0;
+
+			case nvec_io_write_ok:
+			default:
+				printf("!!! %s: unexpected io result %d\n", __func__, res);
+				return 0;
+		}
 	}
 	/*
 	dbg_print();
