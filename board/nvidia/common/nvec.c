@@ -577,8 +577,14 @@ int board_nvec_init(void)
 	dbg_print();
 
 	while (1) {
-		nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
+		res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
+		if (res != nvec_io_read_ok)
+			printf("io error %d\n", res);
 		dbg_print();
+		msg_print();
+		dbg_i = -1;
+		msg_i = -1;
+		key_i = -1;
 		udelay(100);
 	}
 
