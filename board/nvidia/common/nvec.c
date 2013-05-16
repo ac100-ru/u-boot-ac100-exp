@@ -580,6 +580,7 @@ int board_nvec_init(void)
 
 	dbg_print();
 
+	/*
 	while (1) {
 		res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
 		if (res != nvec_io_not_ready) {
@@ -598,6 +599,7 @@ int board_nvec_init(void)
 		key_i = -1;
 		mdelay(20);
 	}
+	*/
 
 	return 1;
 }
@@ -654,13 +656,13 @@ int nvec_read_events(void)
 		dbg_i = -1;
 		msg_i = -1;
 		res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
+		mdelay(NVEC_TIMEOUT_MIN);
 		switch (res) {
 			case nvec_io_not_ready:
 				return 0;
 
 			case nvec_io_read_ok:
 			case nvec_io_retry:
-				udelay(100);
 				break;
 
 			case nvec_io_error:
