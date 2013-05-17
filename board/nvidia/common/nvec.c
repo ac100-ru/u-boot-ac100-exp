@@ -135,6 +135,13 @@ enum nvec_event_size {
 	NVEC_VAR_SIZE,
 };
 
+enum sys_subcmds {
+	SYS_GET_STATUS,
+	SYS_CNFG_EVENT_REPORTING,
+	SYS_ACK_STATUS,
+	SYS_CNFG_WAKE = 0xfd,
+};
+
 enum kbd_subcmds {
 	CNFG_WAKE = 3,
 	CNFG_WAKE_KEY_REPORTING,
@@ -705,7 +712,7 @@ int nvec_pop_key(void)
 
 static void nvec_configure_event(long mask, int state)
 {
-	char buf[7] = { NVEC_SYS, 1, state };
+	char buf[7] = { NVEC_SYS, SYS_CNFG_EVENT_REPORTING, state };
 
 	buf[3] = (mask >> 16) & 0xff;
 	buf[4] = (mask >> 24) & 0xff;
