@@ -73,6 +73,7 @@ const unsigned int NVEC_TIMEOUT_MIN = 20;
 const unsigned int NVEC_TIMEOUT_MAX = 600;
 const int NVEC_WAIT_FOR_EC = 1;
 const int NVEC_DONT_WAIT_FOR_EC = 0;
+const int NVEC_ATTEMPTS_MAX = 10;
 
 enum {
 	nvec_io_error = -1,
@@ -455,33 +456,38 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 int nvec_do_request(char* buf, int size)
 {
 	int res = 0;
-	/*int i = 0;*/
+	int i = 0;
 
 	nvec_data.tx_buf = buf;
 	nvec_data.tx_size = size;
-	nvec_data.tx_pos = 0;
 
-	/*for (i = 0; i < size; ++i)
-		printf("\\x%02x", buf[i]);
-	printf("\n");*/
+	while (i++ < NVEC_ATTEMPTS_MAX) {
+		nvec_data.tx_pos = 0;
 
-	gpio_set_value(nvec_data.gpio, 0);
-	res = nvec_do_io(&nvec_data, NVEC_WAIT_FOR_EC);
-	if (res != nvec_io_write_ok) {
-		printf("nwec_write failed to send request\n");
-		return -1;
+		/* request */
+		gpio_set_value(nvec_data.gpio, 0);
+		res = nvec_do_io(&nvec_data, NVEC_WAIT_FOR_EC);
+		if (res != nvec_io_write_ok) {
+			printf("warning: nvec failed to send request\n");
+			continue;
+		}
+
+		/* response */
+		res = nvec_do_io(&nvec_data, NVEC_WAIT_FOR_EC);
+		if (res != nvec_io_read_ok) {
+			printf("warning: nvec failed to read response\n");
+			continue;
+		}
+
+		nvec_data.tx_buf = 0;
+		nvec_data.tx_size = 0;
+		nvec_data.tx_pos = 0;
+
+		return 0;
 	}
-	res = nvec_do_io(&nvec_data, NVEC_WAIT_FOR_EC);
-	if (res != nvec_io_read_ok) {
-		printf("nwec_write failed to read response\n");
-		return -1;
-	}
 
-	nvec_data.tx_buf = 0;
-	nvec_data.tx_size = 0;
-	nvec_data.tx_pos = 0;
-
-	return 0;
+	printf("nvec failed to perform request\n");
+	return -1;
 }
 
 /**
@@ -624,8 +630,6 @@ void nvec_enable_kbd_events(void)
 	if ((res = nvec_do_request(cnfg_wake, 4))) {
 		printf("NVEC: wake reuqest were not configured (%d), retry\n", res);
 		dbg_save(0xff, 0xff);
-		if (nvec_do_request(cnfg_wake, 4))
-			printf("NVEC: wake reuqest were not configured (%d)\n", res);
 	}
 
 	/* keyboard needs reset via mouse command */
