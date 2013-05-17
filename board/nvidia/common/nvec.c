@@ -259,10 +259,9 @@ void nvec_init_i2c_slave(struct nvec_t* nvec)
 	    (0x2 << I2C_CNFG_DEBOUNCE_CNT_SHIFT);
 	writel(val, nvec->base + I2C_CNFG);
 
-	/* FIXME: get clock from DT */
 	/* i2c3 -> 67 */
 	clock_start_periph_pll(67, CLOCK_ID_PERIPH,
-			80000 * 8);
+			nvec->i2c_clk * 8);
 
 	reset_periph(67, 1);
 
