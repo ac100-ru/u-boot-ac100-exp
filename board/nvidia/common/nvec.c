@@ -616,8 +616,6 @@ void nvec_enable_kbd_events(void)
 {
 	int res;
 
-	// TODO Remove mdelays ?
-
 	if (nvec_do_request(enable_kbd, 2))
 		printf("NVEC: failed to enable keyboard\n");
 
