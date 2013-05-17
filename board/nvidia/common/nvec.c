@@ -246,6 +246,16 @@ static int nvec_is_event(struct nvec_t* nvec)
 	return nvec->rx_buf[0] >> 7;
 }
 
+
+/**
+ * Process incoming io message.
+ * If message is keyboard event then key code will
+ * be added to keys buffer.
+ *
+ * See: nvec_push_key, nvec_pop_key, nvec_have_key
+ *
+ * @param nvec			nvec state struct
+ */
 void nvec_process_msg(struct nvec_t* nvec)
 {
 	int code, state;
@@ -278,6 +288,11 @@ void nvec_process_msg(struct nvec_t* nvec)
 }
 
 
+/**
+ * Init i2c controller to operate in slave mode.
+ *
+ * @param nvec			nvec state struct
+ */
 void nvec_init_i2c_slave(struct nvec_t* nvec)
 {
 	unsigned long val;
@@ -312,6 +327,19 @@ static inline int is_ready(unsigned long status)
 }
 
 
+/**
+ * Perform complete io operation (read or write).
+ * NOTE: function will wait NVEC_TIMEOUT_MIN (20ms)
+ * before status check to avoid nvec hang.
+ *
+ * @param nvec			nvec state struct
+ * @param wait_for_ec	if 1(NVEC_WAIT_FOR_EC) operation
+ *						timeout is NVEC_TIMEOUT_MAX (600ms),
+ *						otherwise function will return if io
+ *						is not ready.
+ *
+ * @return nvec_io_* code
+ */
 int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 {
 	unsigned int poll_start_ms = 0;
@@ -444,6 +472,14 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 #undef AS_BOOL
 }
 
+/**
+ * Send request and read response. If write or read failed
+ * operation will be repeated NVEC_ATTEMPTS_MAX times.
+ *
+ * @param buf		request data
+ * @param size		request data size
+ * @return 0 if ok, -1 on error
+ */
 int nvec_do_request(char* buf, int size)
 {
 	int res = 0;
