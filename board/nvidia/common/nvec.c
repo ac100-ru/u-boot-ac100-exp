@@ -298,6 +298,7 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 	int is_first_iteration = 1;
 
 	poll_start_ms = get_timer(0);
+	mdelay(NVEC_TIMEOUT_MIN);
 
 #define AS_BOOL(x) ((int)((x) == 0 ? 0 : 1))
 	while (1) {
@@ -465,13 +466,11 @@ int nvec_do_request(char* buf, int size)
 	printf("\n");*/
 
 	gpio_set_value(nvec_data.gpio, 0);
-	mdelay(NVEC_TIMEOUT_MIN);
 	res = nvec_do_io(&nvec_data, NVEC_WAIT_FOR_EC);
 	if (res != nvec_io_write_ok) {
 		printf("nwec_write failed to send request\n");
 		return -1;
 	}
-	mdelay(NVEC_TIMEOUT_MIN);
 	res = nvec_do_io(&nvec_data, NVEC_WAIT_FOR_EC);
 	if (res != nvec_io_read_ok) {
 		printf("nwec_write failed to read response\n");
@@ -602,7 +601,6 @@ int board_nvec_init(void)
 		dbg_i = -1;
 		msg_i = -1;
 		key_i = -1;
-		mdelay(20);
 	}
 	*/
 
@@ -619,7 +617,6 @@ void nvec_enable_kbd_events(void)
 	/* Enable keyboard */
 	if (nvec_do_request(enable_kbd, 2))
 		printf("NVEC: failed to enable keyboard\n");
-	mdelay(NVEC_TIMEOUT_MIN);
 
 	/* FIXME Sometimes wake faild first time (maybe already fixed).
 	 * Need to check
@@ -630,20 +627,16 @@ void nvec_enable_kbd_events(void)
 		if (nvec_do_request(cnfg_wake, 4))
 			printf("NVEC: wake reuqest were not configured (%d)\n", res);
 	}
-	mdelay(NVEC_TIMEOUT_MIN);
 
 	/* keyboard needs reset via mouse command */
 	if (nvec_do_request(reset_kbd, 4))
 		printf("NVEC: failed to reset keyboard\n");
-	mdelay(NVEC_TIMEOUT_MIN);
 
 	if (nvec_do_request(cnfg_wake_key_reporting, 3))
 		printf("NVEC: failed to configure waky key reporting\n");
-	mdelay(NVEC_TIMEOUT_MIN);
 
 	if (nvec_do_request(clear_leds, 3))
 		printf("NVEC: failed to clear leds\n");
-	mdelay(NVEC_TIMEOUT_MIN);
 
 	/* Disable caps lock LED */
 	/*nvec_do_request(clear_leds, sizeof(clear_leds));
@@ -662,7 +655,6 @@ int nvec_read_events(void)
 		dbg_i = -1;
 		msg_i = -1;
 		res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
-		mdelay(NVEC_TIMEOUT_MIN);
 		switch (res) {
 			case nvec_io_not_ready:
 				return 0;
