@@ -183,11 +183,15 @@ struct key_t {
 	int state;
 };
 
-struct key_t keys[256];
+#define keys_cnt 256
+struct key_t keys[keys_cnt];
 int key_i = -1;
 
 void nvec_push_key(int code, int state)
 {
+	if (key_i + 1 >= keys_cnt)
+		return;
+
 	++key_i;
 	keys[key_i].code = code;
 	keys[key_i].state = state;
