@@ -219,11 +219,15 @@ int nvec_pop_key(void)
 }
 
 
-int msg[256];
+#define msg_cnt 256
+int msg[msg_cnt];
 int msg_i = -1;
 
 void msg_save(const char* buf)
 {
+	if (msg_i + 1 >= msg_cnt)
+		return;
+
 	++msg_i;
 	msg[msg_i] = *(int*)buf;
 }
