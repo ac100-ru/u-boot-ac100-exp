@@ -35,11 +35,15 @@ struct dbg_t {
 	unsigned int data;
 };
 
-static struct dbg_t dbg[256];
+#define dbg_cnt 256
+static struct dbg_t dbg[dbg_cnt];
 static int dbg_i = -1;
 
 static inline void dbg_save(unsigned long status, unsigned int data)
 {
+	if (dbg_i + 1 >= dbg_cnt)
+		return;
+
 	++dbg_i;
 	dbg[dbg_i].status = status;
 	dbg[dbg_i].data = data;
