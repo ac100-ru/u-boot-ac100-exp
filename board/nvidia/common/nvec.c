@@ -29,7 +29,6 @@
 DECLARE_GLOBAL_DATA_PTR;
 
 
-int debug = 0;
 struct dbg_t {
 	unsigned long status;
 	unsigned int data;
@@ -342,9 +341,6 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 		}
 		is_first_iteration = 0;
 
-		if (debug)
-			printf("NVEC: status: 0x%lx\n", status);
-
 		if (is_read(status)) {
 			received = readl(nvec->base + I2C_SL_RCVD);
 			dbg_save(status, received);
@@ -446,10 +442,6 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 		}
 	}
 #undef AS_BOOL
-
-
-	if (debug)
-		printf("%s: NVEC:\n", __func__);
 }
 
 int nvec_do_request(char* buf, int size)
@@ -467,14 +459,14 @@ int nvec_do_request(char* buf, int size)
 		gpio_set_value(nvec_data.gpio, 0);
 		res = nvec_do_io(&nvec_data, NVEC_WAIT_FOR_EC);
 		if (res != nvec_io_write_ok) {
-			printf("warning: nvec failed to send request\n");
+			debug("warning: nvec failed to send request\n");
 			continue;
 		}
 
 		/* response */
 		res = nvec_do_io(&nvec_data, NVEC_WAIT_FOR_EC);
 		if (res != nvec_io_read_ok) {
-			printf("warning: nvec failed to read response\n");
+			debug("warning: nvec failed to read response\n");
 			continue;
 		}
 
@@ -485,7 +477,7 @@ int nvec_do_request(char* buf, int size)
 		return 0;
 	}
 
-	printf("nvec failed to perform request\n");
+	error("nvec failed to perform request\n");
 	return -1;
 }
 
@@ -503,19 +495,19 @@ static int nvec_decode_config(const void *blob,
 
 	node = fdtdec_next_compatible(blob, 0, COMPAT_NVIDIA_TEGRA20_NVEC);
 	if (node < 0) {
-		debug("%s: Cannot find NVEC node in fdt\n",
+		error("%s: Cannot find NVEC node in fdt\n",
 		      __func__);
 		return node;
 	}
 
 	config->base_addr = fdtdec_get_addr(blob, node, "reg");
 	if (config->base_addr == FDT_ADDR_T_NONE) {
-		debug("%s: No NVEC controller address\n", __func__);
+		error("%s: No NVEC controller address\n", __func__);
 		return -1;
 	}
 
 	if (fdtdec_decode_gpio(blob, node, "request-gpios", &config->request_gpio)) {
-		debug("%s: No NVEC request gpio\n", __func__);
+		error("%s: No NVEC request gpio\n", __func__);
 		return -1;
 	}
 
@@ -549,17 +541,17 @@ int board_nvec_init(void)
 	nvec_data.i2c_clk = cfg.i2c_clk; // 80000; /* */
 	nvec_data.base = (void __iomem *)cfg.base_addr; //0x7000c500;
 
-	printf("NVEC initialization...\n");
+	debug("NVEC initialization...\n");
 
 	res = gpio_request(nvec_data.gpio, NULL);
 	if (res != 0)
-		printf("NVEC: err, gpio_request\n");
+		error("NVEC: err, gpio_request\n");
 	res = gpio_direction_output(nvec_data.gpio, 1);
 	if (res != 0)
-		printf("NVEC: err, gpio_direction\n");
+		error("NVEC: err, gpio_direction\n");
 	res = gpio_set_value(nvec_data.gpio, 1);
 	if (res != 0)
-		printf("NVEC: err, gpio_set_value\n");
+		error("NVEC: err, gpio_set_value\n");
 	udelay(100);
 
 	/* init i2c and clocks */
@@ -568,7 +560,7 @@ int board_nvec_init(void)
 	/* get firmware */
 	/* enable keyboard */
 
-	printf("NVEC is initialized\n");
+	debug("NVEC is initialized\n");
 
 	res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
 	nvec_do_request(noop, 2);
@@ -594,7 +586,7 @@ int board_nvec_init(void)
 		if (res != nvec_io_not_ready) {
 			printf("io result %d\n", res);
 			if (res == nvec_io_timeout) {
-				printf("dbg_i: %d, msg_i: %d, key_i: %d\n", dbg_i, msg_i, key_i);
+				error("dbg_i: %d, msg_i: %d, key_i: %d\n", dbg_i, msg_i, key_i);
 				dbg_print();
 				msg_print();
 				nvec_do_request(noop, 2);
@@ -617,26 +609,26 @@ void nvec_enable_kbd_events(void)
 	int res;
 
 	if (nvec_do_request(enable_kbd, 2))
-		printf("NVEC: failed to enable keyboard\n");
+		error("NVEC: failed to enable keyboard\n");
 
 	/* FIXME Sometimes wake faild first time (maybe already fixed).
 	 * Need to check
 	 */
 	if ((res = nvec_do_request(cnfg_wake, 4))) {
-		printf("NVEC: wake reuqest were not configured (%d), retry\n", res);
+		error("NVEC: wake reuqest were not configured (%d), retry\n", res);
 		dbg_save(0xff, 0xff);
 	}
 
 	if (nvec_do_request(reset_kbd, 4))
-		printf("NVEC: failed to reset keyboard\n");
+		error("NVEC: failed to reset keyboard\n");
 
 	if (nvec_do_request(cnfg_wake_key_reporting, 3))
-		printf("NVEC: failed to configure waky key reporting\n");
+		error("NVEC: failed to configure waky key reporting\n");
 
 	if (nvec_do_request(clear_leds, 3))
-		printf("NVEC: failed to clear leds\n");
+		error("NVEC: failed to clear leds\n");
 
-	printf("NVEC: keyboard initialization finished\n");
+	debug("NVEC: keyboard initialization finished\n");
 }
 
 
@@ -664,7 +656,7 @@ int nvec_read_events(void)
 
 			case nvec_io_write_ok:
 			default:
-				printf("!!! %s: unexpected io result %d\n", __func__, res);
+				debug("%s: unexpected io result %d\n", __func__, res);
 				return 0;
 		}
 	}
@@ -683,7 +675,7 @@ static void nvec_configure_event(long mask, int state)
 	buf[6] = (mask >> 8) & 0xff;
 
 	if (nvec_do_request(buf, 7))
-		printf("NVEC: failed to configure event (mask 0x%0lx, state %d)\n",
+		error("NVEC: failed to configure event (mask 0x%0lx, state %d)\n",
 													mask, state);
 };
 
@@ -692,5 +684,5 @@ static void nvec_toggle_global_events(int state)
 	char global_events[] = { NVEC_SLEEP, GLOBAL_EVENTS, state };
 
 	if (nvec_do_request(global_events, 3))
-		printf("NVEC: failed to enable global events\n");
+		error("NVEC: failed to enable global events\n");
 }
