@@ -197,6 +197,22 @@ void nvec_push_key(int code, int state)
 	keys[key_i].state = state;
 }
 
+int nvec_have_keys(void)
+{
+	return key_i >= 0;
+}
+
+int nvec_pop_key(void)
+{
+	if (key_i == -1)
+		return -1;
+
+	int code = ((keys[key_i].state << 16) | keys[key_i].code);
+	/*printf("key=%d, state=%d\n", code, keys[key_i].state);*/
+	--key_i;
+
+	return code;
+}
 
 
 int msg[256];
@@ -690,24 +706,6 @@ int nvec_read_events(void)
 	return 0;
 }
 
-
-int nvec_have_keys(void)
-{
-	return key_i >= 0;
-}
-
-
-int nvec_pop_key(void)
-{
-	if (key_i == -1)
-		return -1;
-
-	int code = ((keys[key_i].state << 16) | keys[key_i].code);
-	/*printf("key=%d, state=%d\n", code, keys[key_i].state);*/
-	--key_i;
-
-	return code;
-}
 
 static void nvec_configure_event(long mask, int state)
 {
