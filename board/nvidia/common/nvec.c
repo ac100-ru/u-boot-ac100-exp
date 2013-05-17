@@ -357,7 +357,7 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 				nvec->rx_pos = 0;
 				nvec->tx_pos = 0;
 				if (received != nvec->i2c_addr) {
-					printf("%s: NVEC unknown addr 0x%x\n", __func__, received);
+					error("%s: NVEC unknown addr 0x%x\n", __func__, received);
 					return nvec_io_error;
 				}
 				nvec->state = NVST_CMD;
@@ -371,13 +371,13 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 			case NVST_SUBCMD:
 				if (status == (I2C_SL_IRQ | RNW | RCVD)) {
 					if (nvec->rx_buf[0] != 0x01) {
-						printf("%s: NVEC wrong read!\n", __func__);
+						error("%s: NVEC wrong read!\n", __func__);
 						nvec->state = NVST_BEGIN;
 						return nvec_io_error;
 					}
 					nvec->state = NVST_WRITE;
 					if (nvec->tx_buf == 0) {
-						printf("%s: NVEC erro, tx buffer is 0\n", __func__);
+						debug("%s: NVEC erro, tx buffer is 0\n", __func__);
 						nvec->tx_buf = noop;
 						nvec->tx_size = 2;
 						nvec->tx_pos = 0;
@@ -396,7 +396,7 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 
 			case NVST_READ:
 				if (nvec->rx_pos >= 34) {
-					printf("%s: NVEC read buffer is full.\n", __func__);
+					error("%s: NVEC read buffer is full.\n", __func__);
 					break;
 				}
 				nvec->rx_buf[nvec->rx_pos++] = (char)received;
@@ -419,7 +419,7 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 					if (status & END_TRANS)
 						return nvec_io_write_ok;
 
-					printf("%s: NVEC no data to write\n", __func__);
+					error("%s: NVEC no data to write\n", __func__);
 					return nvec_io_error;
 				}
 				to_send = nvec->tx_buf[nvec->tx_pos++];
@@ -434,7 +434,7 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 				break;
 
 			default:
-				printf("%s: NVEC unknown state\n", __func__);
+				error("%s: NVEC unknown state\n", __func__);
 				break;
 		}
 		if (status & END_TRANS) {
