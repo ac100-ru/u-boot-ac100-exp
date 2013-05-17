@@ -212,7 +212,6 @@ int nvec_pop_key(void)
 		return -1;
 
 	int code = ((keys[key_i].state << 16) | keys[key_i].code);
-	/*printf("key=%d, state=%d\n", code, keys[key_i].state);*/
 	--key_i;
 
 	return code;
@@ -301,8 +300,6 @@ void nvec_init_i2c_slave(struct nvec_t* nvec)
 	writel(0, nvec->base + I2C_SL_ADDR2);
 
 	funcmux_select(67, FUNCMUX_DEFAULT);
-
-	/*clk_disable_unprepare(nvec->i2c_clk);*/
 }
 
 static inline int is_read(unsigned long status)
@@ -323,7 +320,6 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 	unsigned int received = 0;
 	unsigned int to_send = 0;
 	unsigned int timeout_ms = NVEC_TIMEOUT_MAX;
-	unsigned int old_state;
 	int is_first_iteration = 1;
 
 	poll_start_ms = get_timer(0);
@@ -351,11 +347,6 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 
 		if (is_read(status)) {
 			received = readl(nvec->base + I2C_SL_RCVD);
-			if (status & RCVD) {
-				//writel(0, nvec->base + I2C_SL_RCVD);
-				//printf("%s: NVEC ack\n", __func__);
-				//udelay(100);
-			}
 			dbg_save(status, received);
 		}
 
@@ -365,17 +356,6 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 			nvec->tx_pos = 0;
 		}
 
-		/*
-		if (status & RCVD) {
-			if (status & END_TRANS)
-				printf("%s: NVEC repeated start\n", __func__);
-			else {
-				printf("%s: NVEC new transaction\n", __func__);
-			}
-		}
-		*/
-
-		old_state = nvec->state;
 		switch (nvec->state) {
 			case NVST_BEGIN:
 				nvec->rx_pos = 0;
@@ -434,8 +414,6 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 			case NVST_WRITE_SIZE:
 				to_send = nvec->tx_size;
 				writel(to_send, nvec->base + I2C_SL_RCVD);
-				//udelay(100);
-				//printf("%s: NVEC sent size:0x%x\n", __func__, to_send);
 				nvec->state = NVST_WRITE;
 				break;
 
@@ -463,14 +441,7 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 				printf("%s: NVEC unknown state\n", __func__);
 				break;
 		}
-		/*if (status & END_TRANS) {
-			nvec->state = NVST_BEGIN;
-			printf("%s: NVEC end of transaction\n", __func__);
-			return;
-		}*/
 		if (status & END_TRANS) {
-			/*printf("%s: NVEC: unknown operation ended (status:0x%x, state:%d, old state:%d)\n", __func__,
-					status, nvec->state, old_state);*/
 			return nvec_io_retry;
 		}
 	}
@@ -543,7 +514,6 @@ static int nvec_decode_config(const void *blob,
 		return -1;
 	}
 
-	//fdt_decode_lcd;
 	if (fdtdec_decode_gpio(blob, node, "request-gpios", &config->request_gpio)) {
 		debug("%s: No NVEC request gpio\n", __func__);
 		return -1;
@@ -648,7 +618,6 @@ void nvec_enable_kbd_events(void)
 
 	// TODO Remove mdelays ?
 
-	/* Enable keyboard */
 	if (nvec_do_request(enable_kbd, 2))
 		printf("NVEC: failed to enable keyboard\n");
 
@@ -660,7 +629,6 @@ void nvec_enable_kbd_events(void)
 		dbg_save(0xff, 0xff);
 	}
 
-	/* keyboard needs reset via mouse command */
 	if (nvec_do_request(reset_kbd, 4))
 		printf("NVEC: failed to reset keyboard\n");
 
@@ -669,10 +637,6 @@ void nvec_enable_kbd_events(void)
 
 	if (nvec_do_request(clear_leds, 3))
 		printf("NVEC: failed to clear leds\n");
-
-	/* Disable caps lock LED */
-	/*nvec_do_request(clear_leds, sizeof(clear_leds));
-	nvec_do_io(&nvec_data);*/
 
 	printf("NVEC: keyboard initialization finished\n");
 }
@@ -706,10 +670,6 @@ int nvec_read_events(void)
 				return 0;
 		}
 	}
-	/*
-	dbg_print();
-	msg_print();
-	*/
 
 	return 0;
 }
