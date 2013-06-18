@@ -29,47 +29,6 @@
 DECLARE_GLOBAL_DATA_PTR;
 
 
-struct dbg_t {
-	unsigned long status;
-	unsigned int data;
-};
-
-#define dbg_cnt 256
-static struct dbg_t dbg[dbg_cnt];
-static int dbg_i = -1;
-
-static inline void dbg_save(unsigned long status, unsigned int data)
-{
-	if (dbg_i + 1 >= dbg_cnt)
-		return;
-
-	++dbg_i;
-	dbg[dbg_i].status = status;
-	dbg[dbg_i].data = data;
-}
-
-static inline void dbg_print(void)
-{
-	if (dbg_i == -1)
-		return;
-
-#define AS_BOOL(x) ((int)((x) == 0 ? 0 : 1))
-	int i = 0;
-	for (i = 0; i <= dbg_i; ++i) {
-		unsigned long status = dbg[i].status;
-		printf("NVEC: status:0x%lx (RNW:%d, RCVD:%d, IRQ:%d, END:%d)",
-				status,
-				AS_BOOL(status & RNW), AS_BOOL(status & RCVD),
-				AS_BOOL(status & I2C_SL_IRQ), AS_BOOL(status & END_TRANS));
-		if ((status & I2C_SL_IRQ))
-			printf(": %u", dbg[i].data);
-		printf("\n");
-	}
-#undef AS_BOOL
-	dbg_i = -1;
-}
-
-
 /* Nvec perfroms io interval is beteween 20 and 500 ms,
 no response in 600 ms means error */
 const unsigned int NVEC_TIMEOUT_MIN = 20;
@@ -130,32 +89,6 @@ char noop[] = { NVEC_CNTL, CNTL_NOOP };
 char get_firmware_version[] = { NVEC_CNTL, CNTL_GET_FIRMWARE_VERSION };
 
 
-#define msg_cnt 256
-int msg[msg_cnt];
-int msg_i = -1;
-
-void msg_save(const unsigned char* buf)
-{
-	if (msg_i + 1 >= msg_cnt)
-		return;
-
-	++msg_i;
-	msg[msg_i] = *(int*)buf;
-}
-
-
-void msg_print(void)
-{
-	if (msg_i == -1)
-		return;
-
-	int i = 0;
-	for (i = 0; i <= msg_i; ++i)
-		printf("msg: 0x%04x\n", msg[i]);
-	msg_i = -1;
-}
-
-
 int nvec_msg_is_event(const unsigned char* msg)
 {
 	return msg[0] >> 7;
@@ -181,8 +114,6 @@ void nvec_process_msg(struct nvec_t* nvec)
 {
 	const unsigned char* msg = (const unsigned char*)nvec->rx_buf;
 	int event_type;
-
-	msg_save(msg);
 
 	if (!nvec_msg_is_event(msg))
 		return;
@@ -274,10 +205,8 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 		}
 		is_first_iteration = 0;
 
-		if (is_read(status)) {
+		if (is_read(status))
 			received = readl(nvec->base + I2C_SL_RCVD);
-			dbg_save(status, received);
-		}
 
 		if (status == (I2C_SL_IRQ | RCVD)) {
 			nvec->state = NVST_BEGIN;
@@ -319,7 +248,6 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 					writel(to_send, nvec->base + I2C_SL_RCVD);
 					gpio_set_value(nvec_data.gpio, 1);
 					nvec->state = NVST_WRITE;
-					dbg_save(status, to_send);
 				} else {
 					nvec->state = NVST_READ;
 					nvec->rx_buf[nvec->rx_pos] = (char)received;
@@ -348,7 +276,6 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 
 			case NVST_WRITE:
 				if (nvec->tx_pos >= nvec->tx_size) {
-					dbg_save(status, 0);
 					if (status & END_TRANS)
 						return nvec_io_write_ok;
 
@@ -357,7 +284,6 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 				}
 				to_send = nvec->tx_buf[nvec->tx_pos++];
 				writel(to_send, nvec->base + I2C_SL_RCVD);
-				dbg_save(status, to_send);
 				if (status & END_TRANS) {
 					nvec->tx_pos = 0;
 					nvec->tx_buf = 0;
@@ -516,30 +442,6 @@ int board_nvec_init(void)
 
 	nvec_enable_kbd_events();
 
-	/*dbg_print();*/
-	dbg_i = -1;
-	msg_i = -1;
-
-	/*
-	while (1) {
-		res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
-		if (res != nvec_io_not_ready) {
-			printf("io result %d\n", res);
-			if (res == nvec_io_timeout) {
-				error("dbg_i: %d, msg_i: %d, key_i: %d\n", dbg_i, msg_i, key_i);
-				dbg_print();
-				msg_print();
-				nvec_do_request(noop, 2);
-			}
-		}
-		while (nvec_have_keys())
-			printf("%d ", nvec_pop_key());
-		dbg_i = -1;
-		msg_i = -1;
-		key_i = -1;
-	}
-	*/
-
 	return 1;
 }
 
@@ -554,10 +456,8 @@ void nvec_enable_kbd_events(void)
 	/* FIXME Sometimes wake faild first time (maybe already fixed).
 	 * Need to check
 	 */
-	if ((res = nvec_do_request(cnfg_wake, 4))) {
+	if ((res = nvec_do_request(cnfg_wake, 4)))
 		error("NVEC: wake reuqest were not configured (%d), retry\n", res);
-		dbg_save(0xff, 0xff);
-	}
 
 	if (nvec_do_request(reset_kbd, 4))
 		error("NVEC: failed to reset keyboard\n");
@@ -578,8 +478,6 @@ int nvec_read_events(void)
 	int cnt = 0;
 
 	while (++cnt <= 8) {
-		dbg_i = -1;
-		msg_i = -1;
 		res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
 		switch (res) {
 			case nvec_io_not_ready:
@@ -591,7 +489,7 @@ int nvec_read_events(void)
 
 			case nvec_io_error:
 			case nvec_io_timeout:
-				dbg_print();
+				debug("%s: io failed %d\n", __func__, res);
 				return 0;
 
 			case nvec_io_write_ok:
