@@ -16,9 +16,8 @@
 #include <asm/arch-tegra/uart.h>
 #include <asm/arch-tegra/warmboot.h>
 #include <i2c.h>
-#include <asm/arch-tegra/nvec.h>
+#include <asm/arch-tegra/nvec-keyboard.h>
 #include "nvec.h"
-#include "nvec-keyboard.h"
 
 #define DEBUG
 
@@ -386,6 +385,7 @@ static int nvec_decode_config(const void *blob,
 
 static void nvec_configure_event(long mask, int state);
 static void nvec_toggle_global_events(int state);
+static void nvec_enable_kbd_events(void);
 
 int board_nvec_init(void)
 {
