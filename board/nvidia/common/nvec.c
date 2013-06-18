@@ -19,8 +19,6 @@
 #include <asm/arch-tegra/nvec-keyboard.h>
 #include "nvec.h"
 
-#define DEBUG
-
 #ifndef CONFIG_TEGRA_NVEC
 #error "You should enable CONFIG_TEGRA_NVEC"
 #endif
@@ -328,9 +326,6 @@ void nvec_enable_kbd_events(void)
 	if (nvec_do_request(enable_kbd, 2))
 		error("NVEC: failed to enable keyboard\n");
 
-	/* FIXME Sometimes wake faild first time (maybe already fixed).
-	 * Need to check
-	 */
 	if ((res = nvec_do_request(cnfg_wake, 4)))
 		error("NVEC: wake reuqest were not configured (%d), retry\n", res);
 
