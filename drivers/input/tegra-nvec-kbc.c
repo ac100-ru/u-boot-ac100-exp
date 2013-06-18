@@ -1,5 +1,6 @@
 /*
- *  (C) Copyright 2011
+ *  (C) Copyright 2011,2013
+ *  Andrey Danin <danindrey@mail.ru>
  *  NVIDIA Corporation <www.nvidia.com>
  *
  * See file CREDITS for list of people who contributed to this
@@ -31,7 +32,7 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/funcmux.h>
 #include <asm/arch-tegra/timer.h>
-#include <asm/arch-tegra/nvec.h>
+#include <asm/arch-tegra/nvec-keyboard.h>
 #include <linux/input.h>
 
 DECLARE_GLOBAL_DATA_PTR;
