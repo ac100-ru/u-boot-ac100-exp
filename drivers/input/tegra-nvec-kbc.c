@@ -32,6 +32,7 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/funcmux.h>
 #include <asm/arch-tegra/timer.h>
+#include <asm/arch-tegra/nvec-events.h>
 #include <asm/arch-tegra/nvec-keyboard.h>
 #include <linux/input.h>
 

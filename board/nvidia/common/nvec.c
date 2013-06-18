@@ -83,7 +83,6 @@ char reset_kbd[] = { NVEC_PS2, MOUSE_SEND_CMD, MOUSE_RESET, 3 };
 char clear_leds[] = { NVEC_KBD, SET_LEDS, 0 };
 char cnfg_wake[] = { NVEC_KBD, CNFG_WAKE, 1, 1 };
 char cnfg_wake_key_reporting[] = { NVEC_KBD, CNFG_WAKE_KEY_REPORTING, 1 };
-
 char noop[] = { NVEC_CNTL, CNTL_NOOP };
 char get_firmware_version[] = { NVEC_CNTL, CNTL_GET_FIRMWARE_VERSION };
 
@@ -123,38 +122,11 @@ void nvec_process_msg(struct nvec_t* nvec)
 }
 
 
-/**
- * Init i2c controller to operate in slave mode.
- *
- * @param nvec			nvec state struct
- */
-void nvec_init_i2c_slave(struct nvec_t* nvec)
-{
-	unsigned long val;
-
-	val = I2C_CNFG_NEW_MASTER_SFM | I2C_CNFG_PACKET_MODE_EN |
-	    (0x2 << I2C_CNFG_DEBOUNCE_CNT_SHIFT);
-	writel(val, nvec->base + I2C_CNFG);
-
-	/* i2c3 -> 67 */
-	clock_start_periph_pll(67, CLOCK_ID_PERIPH,
-			nvec->i2c_clk * 8);
-
-	reset_periph(67, 1);
-
-	writel(I2C_SL_NEWSL, nvec->base + I2C_SL_CNFG);
-	writel(0x1E, nvec->base + I2C_SL_DELAY_COUNT);
-
-	writel(nvec->i2c_addr>>1, nvec->base + I2C_SL_ADDR1);
-	writel(0, nvec->base + I2C_SL_ADDR2);
-
-	funcmux_select(67, FUNCMUX_DEFAULT);
-}
-
 static inline int is_read(unsigned long status)
 {
 	return (status & RNW) == 0;
 }
+
 
 static inline int is_ready(unsigned long status)
 {
@@ -302,6 +274,7 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 #undef AS_BOOL
 }
 
+
 /**
  * Send request and read response. If write or read failed
  * operation will be repeated NVEC_ATTEMPTS_MAX times.
@@ -347,6 +320,86 @@ int nvec_do_request(char* buf, int size)
 	return -1;
 }
 
+
+void nvec_enable_kbd_events(void)
+{
+	int res;
+
+	if (nvec_do_request(enable_kbd, 2))
+		error("NVEC: failed to enable keyboard\n");
+
+	/* FIXME Sometimes wake faild first time (maybe already fixed).
+	 * Need to check
+	 */
+	if ((res = nvec_do_request(cnfg_wake, 4)))
+		error("NVEC: wake reuqest were not configured (%d), retry\n", res);
+
+	if (nvec_do_request(reset_kbd, 4))
+		error("NVEC: failed to reset keyboard\n");
+
+	if (nvec_do_request(cnfg_wake_key_reporting, 3))
+		error("NVEC: failed to configure waky key reporting\n");
+
+	if (nvec_do_request(clear_leds, 3))
+		error("NVEC: failed to clear leds\n");
+
+	debug("NVEC: keyboard initialization finished\n");
+}
+
+
+static void nvec_configure_event(long mask, int state)
+{
+	char buf[7] = { NVEC_SYS, SYS_CNFG_EVENT_REPORTING, state };
+
+	buf[3] = (mask >> 16) & 0xff;
+	buf[4] = (mask >> 24) & 0xff;
+	buf[5] = (mask >> 0) & 0xff;
+	buf[6] = (mask >> 8) & 0xff;
+
+	if (nvec_do_request(buf, 7))
+		error("NVEC: failed to configure event (mask 0x%0lx, state %d)\n",
+													mask, state);
+}
+
+
+static void nvec_toggle_global_events(int state)
+{
+	char global_events[] = { NVEC_SLEEP, GLOBAL_EVENTS, state };
+
+	if (nvec_do_request(global_events, 3))
+		error("NVEC: failed to enable global events\n");
+}
+
+
+/**
+ * Init i2c controller to operate in slave mode.
+ *
+ * @param nvec			nvec state struct
+ */
+static void nvec_init_i2c_slave(struct nvec_t* nvec)
+{
+	unsigned long val;
+
+	val = I2C_CNFG_NEW_MASTER_SFM | I2C_CNFG_PACKET_MODE_EN |
+	    (0x2 << I2C_CNFG_DEBOUNCE_CNT_SHIFT);
+	writel(val, nvec->base + I2C_CNFG);
+
+	/* i2c3 -> 67 */
+	clock_start_periph_pll(67, CLOCK_ID_PERIPH,
+			nvec->i2c_clk * 8);
+
+	reset_periph(67, 1);
+
+	writel(I2C_SL_NEWSL, nvec->base + I2C_SL_CNFG);
+	writel(0x1E, nvec->base + I2C_SL_DELAY_COUNT);
+
+	writel(nvec->i2c_addr>>1, nvec->base + I2C_SL_ADDR1);
+	writel(0, nvec->base + I2C_SL_ADDR2);
+
+	funcmux_select(67, FUNCMUX_DEFAULT);
+}
+
+
 /**
  * Decode the nvec information from the fdt.
  *
@@ -355,14 +408,14 @@ int nvec_do_request(char* buf, int size)
  * @return 0 if ok, -ve on error
  */
 static int nvec_decode_config(const void *blob,
-				       struct fdt_nvec_config *config)
+					   struct fdt_nvec_config *config)
 {
 	int node;
 
 	node = fdtdec_next_compatible(blob, 0, COMPAT_NVIDIA_TEGRA20_NVEC);
 	if (node < 0) {
 		error("%s: Cannot find NVEC node in fdt\n",
-		      __func__);
+			  __func__);
 		return node;
 	}
 
@@ -383,9 +436,6 @@ static int nvec_decode_config(const void *blob,
 	return 0;
 }
 
-static void nvec_configure_event(long mask, int state);
-static void nvec_toggle_global_events(int state);
-static void nvec_enable_kbd_events(void);
 
 int board_nvec_init(void)
 {
@@ -446,32 +496,6 @@ int board_nvec_init(void)
 }
 
 
-void nvec_enable_kbd_events(void)
-{
-	int res;
-
-	if (nvec_do_request(enable_kbd, 2))
-		error("NVEC: failed to enable keyboard\n");
-
-	/* FIXME Sometimes wake faild first time (maybe already fixed).
-	 * Need to check
-	 */
-	if ((res = nvec_do_request(cnfg_wake, 4)))
-		error("NVEC: wake reuqest were not configured (%d), retry\n", res);
-
-	if (nvec_do_request(reset_kbd, 4))
-		error("NVEC: failed to reset keyboard\n");
-
-	if (nvec_do_request(cnfg_wake_key_reporting, 3))
-		error("NVEC: failed to configure waky key reporting\n");
-
-	if (nvec_do_request(clear_leds, 3))
-		error("NVEC: failed to clear leds\n");
-
-	debug("NVEC: keyboard initialization finished\n");
-}
-
-
 int nvec_read_events(void)
 {
 	int res;
@@ -502,25 +526,3 @@ int nvec_read_events(void)
 	return 0;
 }
 
-
-static void nvec_configure_event(long mask, int state)
-{
-	char buf[7] = { NVEC_SYS, SYS_CNFG_EVENT_REPORTING, state };
-
-	buf[3] = (mask >> 16) & 0xff;
-	buf[4] = (mask >> 24) & 0xff;
-	buf[5] = (mask >> 0) & 0xff;
-	buf[6] = (mask >> 8) & 0xff;
-
-	if (nvec_do_request(buf, 7))
-		error("NVEC: failed to configure event (mask 0x%0lx, state %d)\n",
-													mask, state);
-};
-
-static void nvec_toggle_global_events(int state)
-{
-	char global_events[] = { NVEC_SLEEP, GLOBAL_EVENTS, state };
-
-	if (nvec_do_request(global_events, 3))
-		error("NVEC: failed to enable global events\n");
-}
