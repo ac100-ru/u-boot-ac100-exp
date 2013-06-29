@@ -36,58 +36,31 @@
 #include <asm/arch-tegra/nvec-keyboard.h>
 #include <linux/input.h>
 
-DECLARE_GLOBAL_DATA_PTR;
-
 enum {
-	KBC_MAX_GPIO		= 24,
-	KBC_MAX_KPENT		= 8,	/* size of keypress entry queue */
+	KBC_MAX_KPENT = 8,
 };
 
-#define KBC_FIFO_TH_CNT_SHIFT		14
-#define KBC_DEBOUNCE_CNT_SHIFT		4
-#define KBC_CONTROL_FIFO_CNT_INT_EN	(1 << 3)
-#define KBC_CONTROL_KBC_EN		(1 << 0)
-#define KBC_INT_FIFO_CNT_INT_STATUS	(1 << 2)
-#define KBC_KPENT_VALID			(1 << 7)
-#define KBC_ST_STATUS			(1 << 3)
-
-enum {
-	KBC_DEBOUNCE_COUNT	= 2,
-	KBC_REPEAT_RATE_MS	= 30,
-	KBC_REPEAT_DELAY_MS	= 240,
-	KBC_CLOCK_KHZ		= 32,	/* Keyboard uses a 32KHz clock */
-};
-
-/* keyboard controller config and state */
+/* keyboard config/state */
 static struct keyb {
 	struct input_config input;	/* The input layer */
-	struct key_matrix matrix;	/* The key matrix layer */
-
-	struct kbc_tegra *kbc;		/* tegra keyboard controller */
-	unsigned char inited;		/* 1 if keyboard has been inited */
-	unsigned char first_scan;	/* 1 if this is our first key scan */
-	unsigned char created;		/* 1 if driver has been created */
-
-	/*
-	 * After init we must wait a short time before polling the keyboard.
-	 * This gives the tegra keyboard controller time to react after reset
-	 * and lets us grab keys pressed during reset.
-	 */
-	unsigned int init_dly_ms;	/* Delay before we can read keyboard */
-	unsigned int start_time_ms;	/* Time that we inited (in ms) */
-	unsigned int last_poll_ms;	/* Time we should last polled */
-	unsigned int next_repeat_ms;	/* Next time we repeat a key */
+	int created;			/* 1 is driver has been created */
 } config;
 
 
 /**
- * Check the keyboard controller and emit ASCII characters for any keys that
- * are pressed.
+ * Check the tegra nvec keyboard, and send any keys that are pressed.
  *
- * @param config	Keyboard config
+ * This is called by input_tstc() and input_getc() when they need more
+ * characters
+ *
+ * @param input		Input configuration
+ * @return 1, to indicate that we have something to look at
  */
-static int check_for_keys(struct keyb *config)
+int tegra_nvec_kbc_check(struct input_config *input)
 {
+	if (!config.created)
+		return 0;
+
 	int res = 0;
 	int fifo[KBC_MAX_KPENT];
 	int cnt = 0;
@@ -99,31 +72,16 @@ static int check_for_keys(struct keyb *config)
 		res = 1;
 		fifo[cnt++] = nvec_pop_key();
 		if (cnt == KBC_MAX_KPENT) {
-			input_send_keycodes(&config->input, fifo, cnt);
+			input_send_keycodes(input, fifo, cnt);
 			cnt = 0;
 		}
 	}
 
 	if (cnt > 0) {
-		input_send_keycodes(&config->input, fifo, cnt);
+		input_send_keycodes(input, fifo, cnt);
 	}
 
 	return res;
-}
-
-
-/**
- * Check the tegra keyboard, and send any keys that are pressed.
- *
- * This is called by input_tstc() and input_getc() when they need more
- * characters
- *
- * @param input		Input configuration
- * @return 1, to indicate that we have something to look at
- */
-int tegra_nvec_kbc_check(struct input_config *input)
-{
-	return check_for_keys(&config);
 }
 
 /**
@@ -152,7 +110,7 @@ static int kbd_getc(void)
 
 
 /**
- * Set up the tegra keyboard. This is called by the stdio device handler
+ * Set up the keyboard. This is called by the stdio device handler
  *
  * We want to do this init when the keyboard is actually used rather than
  * at start-up, since keyboard input may not currently be selected.
@@ -163,19 +121,18 @@ static int kbd_getc(void)
  *
  * @return 0 if ok, -ve on error
  */
-static int init_nvec_keyboard(void)
+static int tegra_nvec_kbd_init(void)
 {
-	/* check if already created */
 	if (config.created)
 		return 0;
 
 	config.created = 1;
-	config.first_scan = 1;
 
 	printf("%s: NVEC keyboard ready\n", __func__);
 
 	return 0;
 }
+
 
 int drv_keyboard_init(void)
 {
@@ -189,13 +146,14 @@ int drv_keyboard_init(void)
 		return -1;
 	}
 	config.input.read_keys = tegra_nvec_kbc_check;
+	config.created = 0;
 
 	memset(&dev, '\0', sizeof(dev));
 	strcpy(dev.name, "tegra-nvec-kbc");
 	dev.flags = DEV_FLAGS_INPUT | DEV_FLAGS_SYSTEM;
 	dev.getc = kbd_getc;
 	dev.tstc = kbd_tstc;
-	dev.start = init_nvec_keyboard;
+	dev.start = tegra_nvec_kbd_init;
 
 	/* Register the device. init_tegra_keyboard() will be called soon */
 	error = input_stdio_register(&dev);
