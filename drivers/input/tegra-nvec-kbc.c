@@ -81,41 +81,6 @@ static struct keyb {
 
 
 /**
- * Process all the keypress sequences in fifo and send key codes
- *
- * The fifo contains zero or more keypress sets. Each set
- * consists of from 1-8 keycodes, representing the keycodes which
- * were simultaneously pressed during that scan.
- *
- * This function works through each set and generates ASCII characters
- * for each. Not that one set may produce more than one ASCII characters -
- * for example holding down 'd' and 'f' at the same time will generate
- * two ASCII characters.
- *
- * Note: if fifo_cnt is 0, we will tell the input layer that no keys are
- * pressed.
- *
- * @param config	Keyboard config
- * @param fifo_cnt	Number of entries in the keyboard fifo
- */
-#if 0
-static void process_fifo(struct keyb *config, int fifo_cnt)
-{
-	int fifo[KBC_MAX_KPENT];
-	int cnt = 0;
-
-	/* Always call input_send_keycodes() at least once */
-	do {
-		if (fifo_cnt)
-			cnt = tegra_kbc_find_keys(config, fifo, KBC_MAX_KPENT);
-
-		input_send_keycodes(&config->input, fifo, cnt);
-	} while (--fifo_cnt > 0);
-}
-#endif
-
-
-/**
  * Check the keyboard controller and emit ASCII characters for any keys that
  * are pressed.
  *
@@ -126,23 +91,7 @@ static int check_for_keys(struct keyb *config)
 	int res = 0;
 	int fifo[KBC_MAX_KPENT];
 	int cnt = 0;
-	/*int fifo_cnt;*/
 
-	/*
-	if (!config->first_scan &&
-			get_timer(config->last_poll_ms) < KBC_REPEAT_RATE_MS)
-		return 0;
-
-	config->last_poll_ms = get_timer(0);
-	config->first_scan = 0;
-	*/
-
-	/*
-	 * Once we get here we know the keyboard has been scanned. So if there
-	 * scan waiting for us, we know that nothing is held down.
-	 */
-	/*fifo_cnt = (readl(&config->kbc->interrupt) >> 4) & 0xf;*/
-	/*process_fifo(config, fifo_cnt);*/
 	if (!nvec_have_keys())
 		nvec_read_events();
 
@@ -184,7 +133,6 @@ int tegra_nvec_kbc_check(struct input_config *input)
  */
 static int kbd_tstc(void)
 {
-	/*printf("%s: \n", __func__);*/
 	/* Just get input to do this for us */
 	return input_tstc(&config.input);
 }
@@ -198,7 +146,6 @@ static int kbd_tstc(void)
  */
 static int kbd_getc(void)
 {
-	/*printf("%s: \n", __func__);*/
 	/* Just get input to do this for us */
 	return input_getc(&config.input);
 }
@@ -218,59 +165,9 @@ static int kbd_getc(void)
  */
 static int init_nvec_keyboard(void)
 {
-	/*printf("%s: \n", __func__);*/
-
 	/* check if already created */
 	if (config.created)
 		return 0;
-
-#if 0
-#ifdef CONFIG_OF_CONTROL
-	int	node;
-
-	node = fdtdec_next_compatible(gd->fdt_blob, 0,
-					  COMPAT_NVIDIA_TEGRA20_KBC);
-	if (node < 0) {
-		printf("%s: cannot locate keyboard node\n", __func__);
-		return node;
-	}
-	config.kbc = (struct kbc_tegra *)fdtdec_get_addr(gd->fdt_blob,
-		       node, "reg");
-	if ((fdt_addr_t)config.kbc == FDT_ADDR_T_NONE) {
-		printf("%s: No keyboard register found\n", __func__);
-		return -1;
-	}
-	input_set_delays(&config.input, KBC_REPEAT_DELAY_MS,
-			KBC_REPEAT_RATE_MS);
-
-	/* Decode the keyboard matrix information (16 rows, 8 columns) */
-	if (key_matrix_init(&config.matrix, 16, 8, 1)) {
-		printf("%s: Could not init key matrix\n", __func__);
-		return -1;
-	}
-	if (key_matrix_decode_fdt(&config.matrix, gd->fdt_blob, node)) {
-		printf("%s: Could not decode key matrix from fdt\n", __func__);
-		return -1;
-	}
-	if (config.matrix.fn_keycode) {
-		if (input_add_table(&config.input, KEY_FN, -1,
-				    config.matrix.fn_keycode,
-				    config.matrix.key_count)) {
-			printf("%s: can't add table\n", __func__);
-			return -1;
-		}
-	}
-#else
-#error "Tegra keyboard driver requires FDT definitions"
-#endif
-
-	/* Set up pin mux and enable the clock */
-	funcmux_select(PERIPH_ID_KBC, FUNCMUX_DEFAULT);
-	clock_enable(PERIPH_ID_KBC);
-	config_kbc_gpio(config.kbc);
-
-	tegra_kbc_open();
-#endif // 0
 
 	config.created = 1;
 	config.first_scan = 1;
