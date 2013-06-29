@@ -1,6 +1,4 @@
 /*
- * drivers/input/keyboard/tegra-nvec.c
- *
  * Keyboard class input driver for keyboards connected to an NvEc compliant
  * embedded controller
  *
