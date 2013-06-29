@@ -21,6 +21,9 @@
  * MA 02111-1307 USA
  */
 
+#define _DEBUG 1
+#define DEBUG 1
+
 #include <common.h>
 #include <fdtdec.h>
 
@@ -102,10 +105,7 @@ struct fdt_nvec_config {
 char enable_kbd[] = { NVEC_KBD, ENABLE_KBD };
 char reset_kbd[] = { NVEC_PS2, MOUSE_SEND_CMD, MOUSE_RESET, 3 };
 char clear_leds[] = { NVEC_KBD, SET_LEDS, 0 };
-char cnfg_wake[] = { NVEC_KBD, CNFG_WAKE, 1, 1 };
-char cnfg_wake_key_reporting[] = { NVEC_KBD, CNFG_WAKE_KEY_REPORTING, 1 };
 char noop[] = { NVEC_CNTL, CNTL_NOOP };
-char get_firmware_version[] = { NVEC_CNTL, CNTL_GET_FIRMWARE_VERSION };
 
 
 int nvec_msg_is_event(const unsigned char* msg)
@@ -344,48 +344,14 @@ int nvec_do_request(char* buf, int size)
 
 void nvec_enable_kbd_events(void)
 {
-	int res;
-
+	if (nvec_do_request(reset_kbd, 4))
+		error("NVEC: failed to reset keyboard\n");
+	if (nvec_do_request(clear_leds, 3))
+		error("NVEC: failed to clear leds\n");
 	if (nvec_do_request(enable_kbd, 2))
 		error("NVEC: failed to enable keyboard\n");
 
-	if ((res = nvec_do_request(cnfg_wake, 4)))
-		error("NVEC: wake reuqest were not configured (%d), retry\n", res);
-
-	if (nvec_do_request(reset_kbd, 4))
-		error("NVEC: failed to reset keyboard\n");
-
-	if (nvec_do_request(cnfg_wake_key_reporting, 3))
-		error("NVEC: failed to configure waky key reporting\n");
-
-	if (nvec_do_request(clear_leds, 3))
-		error("NVEC: failed to clear leds\n");
-
 	debug("NVEC: keyboard initialization finished\n");
-}
-
-
-static void nvec_configure_event(long mask, int state)
-{
-	char buf[7] = { NVEC_SYS, SYS_CNFG_EVENT_REPORTING, state };
-
-	buf[3] = (mask >> 16) & 0xff;
-	buf[4] = (mask >> 24) & 0xff;
-	buf[5] = (mask >> 0) & 0xff;
-	buf[6] = (mask >> 8) & 0xff;
-
-	if (nvec_do_request(buf, 7))
-		error("NVEC: failed to configure event (mask 0x%0lx, state %d)\n",
-													mask, state);
-}
-
-
-static void nvec_toggle_global_events(int state)
-{
-	char global_events[] = { NVEC_SLEEP, GLOBAL_EVENTS, state };
-
-	if (nvec_do_request(global_events, 3))
-		error("NVEC: failed to enable global events\n");
 }
 
 
@@ -489,24 +455,7 @@ int board_nvec_init(void)
 		error("NVEC: err, gpio_set_value\n");
 	udelay(100);
 
-	/* init i2c and clocks */
 	nvec_init_i2c_slave(&nvec_data);
-
-	/* get firmware */
-	/* enable keyboard */
-
-	debug("NVEC is initialized\n");
-
-	res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
-	nvec_do_request(noop, 2);
-
-	nvec_toggle_global_events(1);
-	nvec_do_request(get_firmware_version, 2);
-
-	/* LID */
-	nvec_configure_event(0x02, 1);
-	/* short POWER press */
-	nvec_configure_event(0x80, 1);
 
 	nvec_enable_kbd_events();
 
