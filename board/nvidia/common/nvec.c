@@ -21,9 +21,6 @@
  * MA 02111-1307 USA
  */
 
-#define _DEBUG 1
-#define DEBUG 1
-
 #include <common.h>
 #include <fdtdec.h>
 
