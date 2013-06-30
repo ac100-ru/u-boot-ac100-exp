@@ -174,7 +174,6 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 	poll_start_ms = get_timer(0);
 	mdelay(NVEC_TIMEOUT_MIN);
 
-#define AS_BOOL(x) ((int)((x) == 0 ? 0 : 1))
 	while (1) {
 		status = readl(nvec->base + I2C_SL_STATUS);
 		if (!is_ready(status)) {
@@ -286,7 +285,6 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 			return nvec_io_retry;
 		}
 	}
-#undef AS_BOOL
 }
 
 
