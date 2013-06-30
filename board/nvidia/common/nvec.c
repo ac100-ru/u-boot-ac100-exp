@@ -99,9 +99,6 @@ struct fdt_nvec_config {
 
 
 /* nvec commands */
-char enable_kbd[] = { NVEC_KBD, ENABLE_KBD };
-char reset_kbd[] = { NVEC_PS2, MOUSE_SEND_CMD, MOUSE_RESET, 3 };
-char clear_leds[] = { NVEC_KBD, SET_LEDS, 0 };
 char noop[] = { NVEC_CNTL, CNTL_NOOP };
 
 
@@ -336,19 +333,6 @@ int nvec_do_request(char* buf, int size)
 
 	error("nvec failed to perform request\n");
 	return -1;
-}
-
-
-void nvec_enable_kbd_events(void)
-{
-	if (nvec_do_request(reset_kbd, 4))
-		error("NVEC: failed to reset keyboard\n");
-	if (nvec_do_request(clear_leds, 3))
-		error("NVEC: failed to clear leds\n");
-	if (nvec_do_request(enable_kbd, 2))
-		error("NVEC: failed to enable keyboard\n");
-
-	debug("NVEC: keyboard initialization finished\n");
 }
 
 

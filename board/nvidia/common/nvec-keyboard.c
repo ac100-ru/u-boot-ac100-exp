@@ -21,6 +21,7 @@
  * MA 02111-1307 USA
  */
 
+#include <common.h>
 #include <asm/arch-tegra/nvec-keyboard.h>
 #include "nvec-keytable.h"
 #include "nvec.h"
@@ -33,6 +34,11 @@ struct key_t {
 
 static struct key_t keys[NVEC_KEYS_QUEUE_SIZE];
 static int key_i = -1;
+
+/* nvec commands */
+static char enable_kbd[] = { NVEC_KBD, ENABLE_KBD };
+static char reset_kbd[] = { NVEC_PS2, MOUSE_SEND_CMD, MOUSE_RESET, 3 };
+static char clear_leds[] = { NVEC_KBD, SET_LEDS, 0 };
 
 
 void nvec_push_key(int code, int state)
@@ -86,5 +92,18 @@ void nvec_process_keyboard_msg(const unsigned char* msg)
 	state = msg[1] & 0x80;
 
 	nvec_push_key(code_tabs[_size][code], state);
+}
+
+
+void nvec_enable_kbd_events(void)
+{
+	if (nvec_do_request(reset_kbd, 4))
+		error("NVEC: failed to reset keyboard\n");
+	if (nvec_do_request(clear_leds, 3))
+		error("NVEC: failed to clear leds\n");
+	if (nvec_do_request(enable_kbd, 2))
+		error("NVEC: failed to enable keyboard\n");
+
+	debug("NVEC: keyboard initialization finished\n");
 }
 

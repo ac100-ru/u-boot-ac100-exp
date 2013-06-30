@@ -103,6 +103,16 @@ int board_nvec_init(void);
 int nvec_msg_is_event(const unsigned char* msg);
 int nvec_msg_event_type(const unsigned char* msg);
 
+/**
+ * Send request and read response. If write or read failed
+ * operation will be repeated NVEC_ATTEMPTS_MAX times.
+ *
+ * @param buf		request data
+ * @param size		request data size
+ * @return 0 if ok, -1 on error
+ */
+int nvec_do_request(char* buf, int size);
+
 
 #endif /* _NVIDIA_NVEC_H_ */
 
