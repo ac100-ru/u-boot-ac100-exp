@@ -43,7 +43,6 @@ enum {
 /* keyboard config/state */
 static struct keyb {
 	struct input_config input;	/* The input layer */
-	int created;			/* 1 is driver has been created */
 } config;
 
 
@@ -58,9 +57,6 @@ static struct keyb {
  */
 int tegra_nvec_kbc_check(struct input_config *input)
 {
-	if (!config.created)
-		return 0;
-
 	int res = 0;
 	int fifo[KBC_MAX_KPENT];
 	int cnt = 0;
@@ -109,31 +105,6 @@ static int kbd_getc(void)
 }
 
 
-/**
- * Set up the keyboard. This is called by the stdio device handler
- *
- * We want to do this init when the keyboard is actually used rather than
- * at start-up, since keyboard input may not currently be selected.
- *
- * Once the keyboard starts there will be a period during which we must
- * wait for the keyboard to init. We do this only when a key is first
- * read - see kbd_wait_for_fifo_init().
- *
- * @return 0 if ok, -ve on error
- */
-static int tegra_nvec_kbd_init(void)
-{
-	if (config.created)
-		return 0;
-
-	config.created = 1;
-
-	printf("%s: NVEC keyboard ready\n", __func__);
-
-	return 0;
-}
-
-
 int drv_keyboard_init(void)
 {
 	struct stdio_dev dev;
@@ -146,14 +117,12 @@ int drv_keyboard_init(void)
 		return -1;
 	}
 	config.input.read_keys = tegra_nvec_kbc_check;
-	config.created = 0;
 
 	memset(&dev, '\0', sizeof(dev));
 	strcpy(dev.name, "tegra-nvec-kbc");
 	dev.flags = DEV_FLAGS_INPUT | DEV_FLAGS_SYSTEM;
 	dev.getc = kbd_getc;
 	dev.tstc = kbd_tstc;
-	dev.start = tegra_nvec_kbd_init;
 
 	/* Register the device. init_tegra_keyboard() will be called soon */
 	error = input_stdio_register(&dev);
