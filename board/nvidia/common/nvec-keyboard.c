@@ -31,33 +31,8 @@ struct key_t {
 	int state;
 };
 
-struct key_t keys[NVEC_KEYS_QUEUE_SIZE];
-int key_i = -1;
-
-
-void nvec_process_keyboard_msg(const unsigned char* msg)
-{
-	int code, state;
-	int event_type;
-	int _size;
-
-	event_type = nvec_msg_event_type(msg);
-	if (event_type != NVEC_KEYBOARD)
-		return;
-
-	_size = (msg[0] & (3 << 5)) >> 5;
-
-	if (_size == NVEC_VAR_SIZE)
-		return;
-
-	if (_size == NVEC_3BYTES)
-		msg++;
-
-	code = msg[1] & 0x7f;
-	state = msg[1] & 0x80;
-
-	nvec_push_key(code_tabs[_size][code], state);
-}
+static struct key_t keys[NVEC_KEYS_QUEUE_SIZE];
+static int key_i = -1;
 
 
 void nvec_push_key(int code, int state)
@@ -86,5 +61,30 @@ int nvec_pop_key(void)
 	--key_i;
 
 	return code;
+}
+
+
+void nvec_process_keyboard_msg(const unsigned char* msg)
+{
+	int code, state;
+	int event_type;
+	int _size;
+
+	event_type = nvec_msg_event_type(msg);
+	if (event_type != NVEC_KEYBOARD)
+		return;
+
+	_size = (msg[0] & (3 << 5)) >> 5;
+
+	if (_size == NVEC_VAR_SIZE)
+		return;
+
+	if (_size == NVEC_3BYTES)
+		msg++;
+
+	code = msg[1] & 0x7f;
+	state = msg[1] & 0x80;
+
+	nvec_push_key(code_tabs[_size][code], state);
 }
 
