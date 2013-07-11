@@ -37,12 +37,12 @@
 #include <asm/arch-tegra/tegra_mmc.h>
 #include <asm/arch-tegra/mmc.h>
 #endif
+#ifdef CONFIG_TEGRA_NVEC
+#include <asm/arch-tegra/tegra_nvec.h>
+#endif
 #include <i2c.h>
 #include <spi.h>
 #include "emc.h"
-#ifdef CONFIG_TEGRA_NVEC
-#include "nvec.h"
-#endif
 
 DECLARE_GLOBAL_DATA_PTR;
 

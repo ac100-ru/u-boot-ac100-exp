@@ -38,9 +38,9 @@
 #include <asm/arch-tegra/timer.h>
 #include <asm/arch-tegra/uart.h>
 #include <asm/arch-tegra/warmboot.h>
-#include <i2c.h>
-#include <asm/arch-tegra/nvec-keyboard.h>
-#include "nvec.h"
+#include <asm/arch-tegra/tegra_nvec.h>
+#include <asm/arch-tegra/tegra_nvec_keyboard.h>
+/*#include <i2c.h>*/
 
 #ifndef CONFIG_TEGRA_NVEC
 #error "You should enable CONFIG_TEGRA_NVEC"

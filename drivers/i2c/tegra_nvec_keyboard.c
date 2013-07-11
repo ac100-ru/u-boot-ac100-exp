@@ -23,9 +23,9 @@
 
 #include <common.h>
 #include <circbuf.h>
-#include <asm/arch-tegra/nvec-keyboard.h>
-#include "nvec-keytable.h"
-#include "nvec.h"
+#include <asm/arch-tegra/tegra_nvec_keyboard.h>
+#include <asm/arch-tegra/tegra_nvec_keytable.h>
+#include <asm/arch-tegra/tegra_nvec.h>
 
 
 circbuf_t key_buf = { 0, 0, NULL, NULL, NULL, NULL };
