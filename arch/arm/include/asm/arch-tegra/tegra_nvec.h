@@ -21,8 +21,8 @@
  * MA 02111-1307 USA
  */
 
-#ifndef _NVIDIA_NVEC_H_
-#define _NVIDIA_NVEC_H_
+#ifndef _TEGRA_NVEC_H_
+#define _TEGRA_NVEC_H_
 
 #define I2C_CNFG			0x00
 #define I2C_CNFG_PACKET_MODE_EN		(1<<10)
@@ -114,4 +114,4 @@ int nvec_msg_event_type(const unsigned char *msg);
 int nvec_do_request(char *buf, int size);
 
 
-#endif /* _NVIDIA_NVEC_H_ */
+#endif /* _TEGRA_NVEC_H_ */

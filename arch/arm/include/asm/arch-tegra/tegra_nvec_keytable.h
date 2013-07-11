@@ -19,6 +19,9 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+#ifndef _TEGRA_NVEC_KEYTABLE_H_
+#define _TEGRA_NVEC_KEYTABLE_H_
+
 #include <linux/input.h>
 
 
@@ -306,3 +309,5 @@ static unsigned short extcode_tab_us102[] = {
 };
 
 static unsigned short *code_tabs[] = { code_tab_102us, extcode_tab_us102 };
+
+#endif /* _TEGRA_NVEC_KEYTABLE_H_ */

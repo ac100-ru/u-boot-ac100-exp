@@ -21,11 +21,11 @@
  * MA 02111-1307 USA
  */
 
-#ifndef _NVIDIA_NVEC_EVENTS_H_
-#define _NVIDIA_NVEC_EVENTS_H_
+#ifndef _TEGRA_NVEC_EVENTS_H_
+#define _TEGRA_NVEC_EVENTS_H_
 
 
 int nvec_read_events(void);
 
 
-#endif /* _NVIDIA_NVEC_EVENTS_H_ */
+#endif /* _TEGRA_NVEC_EVENTS_H_ */
