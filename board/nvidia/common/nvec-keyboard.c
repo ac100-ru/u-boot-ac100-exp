@@ -22,18 +22,13 @@
  */
 
 #include <common.h>
+#include <circbuf.h>
 #include <asm/arch-tegra/nvec-keyboard.h>
 #include "nvec-keytable.h"
 #include "nvec.h"
 
 
-struct key_t {
-	int code;
-	int state;
-};
-
-static struct key_t keys[NVEC_KEYS_QUEUE_SIZE];
-static int key_i = -1;
+circbuf_t key_buf = { 0, 0, NULL, NULL, NULL, NULL };
 
 /* nvec commands */
 static char enable_kbd[] = { NVEC_KBD, ENABLE_KBD };
@@ -41,32 +36,35 @@ static char reset_kbd[] = { NVEC_PS2, MOUSE_SEND_CMD, MOUSE_RESET, 3 };
 static char clear_leds[] = { NVEC_KBD, SET_LEDS, 0 };
 
 
-void nvec_push_key(int code, int state)
+void nvec_push_key(unsigned short code, unsigned short state)
 {
-	if (key_i + 1 >= NVEC_KEYS_QUEUE_SIZE)
+	int code_state;
+
+	assert(key_buf.totalsize > 0);
+
+	if (key_buf.size == key_buf.totalsize)
 		return;
 
-	++key_i;
-	keys[key_i].code = code;
-	keys[key_i].state = state;
+	code_state = ((state << 16) | code);
+	buf_push(&key_buf, (const char *)&code_state, sizeof(code_state));
 }
 
 
 int nvec_have_keys(void)
 {
-	return key_i >= 0;
+	return key_buf.size > 0;
 }
 
 
 int nvec_pop_key(void)
 {
-	if (key_i == -1)
+	int code_state;
+	int len = buf_pop(&key_buf, (char *)&code_state, sizeof(code_state));
+
+	if (len < sizeof(code_state))
 		return -1;
 
-	int code = ((keys[key_i].state << 16) | keys[key_i].code);
-	--key_i;
-
-	return code;
+	return code_state;
 }
 
 
@@ -97,6 +95,8 @@ void nvec_process_keyboard_msg(const unsigned char* msg)
 
 void nvec_enable_kbd_events(void)
 {
+	buf_init(&key_buf, NVEC_KEYS_QUEUE_SIZE * sizeof(int));
+
 	if (nvec_do_request(reset_kbd, 4))
 		error("NVEC: failed to reset keyboard\n");
 	if (nvec_do_request(clear_leds, 3))
