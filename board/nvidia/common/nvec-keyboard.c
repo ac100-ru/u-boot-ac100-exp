@@ -68,7 +68,7 @@ int nvec_pop_key(void)
 }
 
 
-void nvec_process_keyboard_msg(const unsigned char* msg)
+void nvec_process_keyboard_msg(const unsigned char *msg)
 {
 	int code, state;
 	int event_type;
@@ -106,4 +106,3 @@ void nvec_enable_kbd_events(void)
 
 	debug("NVEC: keyboard initialization finished\n");
 }
-

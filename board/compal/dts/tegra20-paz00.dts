@@ -92,13 +92,8 @@
 	nvec {
 		compatible = "nvidia,tegra20-nvec";
 		reg = <0x7000c500 0x100>;
-		#address-cells = <1>;
-		#size-cells = <0>;
 		clock-frequency = <80000>;
 		request-gpios = <&gpio 170 0>; /* gpio PV2 */
 		slave-addr = <138>;
-
-		nvidia,nvec-uses-kbd;
-		nvidia,nvec-uses-oem = "nvec-paz00";
 	};
 };

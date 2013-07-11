@@ -51,11 +51,15 @@ DECLARE_GLOBAL_DATA_PTR;
 
 /* Nvec perfroms io interval is beteween 20 and 500 ms,
 no response in 600 ms means error */
-const unsigned int NVEC_TIMEOUT_MIN = 20;
-const unsigned int NVEC_TIMEOUT_MAX = 600;
-const int NVEC_WAIT_FOR_EC = 1;
-const int NVEC_DONT_WAIT_FOR_EC = 0;
-const int NVEC_ATTEMPTS_MAX = 10;
+enum {
+	NVEC_TIMEOUT_MIN = 20,
+	NVEC_TIMEOUT_MAX = 600,
+};
+enum {
+	NVEC_WAIT_FOR_EC = 1,
+	NVEC_DONT_WAIT_FOR_EC = 0,
+	NVEC_ATTEMPTS_MAX = 10,
+};
 
 enum {
 	nvec_io_error = -1,
@@ -75,8 +79,7 @@ enum {
 	NVST_WRITE = 5,
 };
 
-struct nvec_t
-{
+struct nvec_t {
 	int gpio;
 	int i2c_addr;
 	int i2c_clk;
@@ -84,17 +87,17 @@ struct nvec_t
 	int state;
 	char rx_buf[34];
 	int rx_pos;
-	char* tx_buf;
+	char *tx_buf;
 	int tx_pos;
 	int tx_size;
 } nvec_data;
 
 struct fdt_nvec_config {
-	int gpio;			/* config is valid */
-	int i2c_addr;			/* width in pixels */
-	int i2c_clk;			/* height in pixels */
+	int gpio;
+	int i2c_addr;
+	int i2c_clk;
 	fdt_addr_t base_addr;
-	struct fdt_gpio_state request_gpio;	/* GPIO for panel vdd */
+	struct fdt_gpio_state request_gpio;
 };
 
 
@@ -102,13 +105,13 @@ struct fdt_nvec_config {
 char noop[] = { NVEC_CNTL, CNTL_NOOP };
 
 
-int nvec_msg_is_event(const unsigned char* msg)
+int nvec_msg_is_event(const unsigned char *msg)
 {
 	return msg[0] >> 7;
 }
 
 
-int nvec_msg_event_type(const unsigned char* msg)
+int nvec_msg_event_type(const unsigned char *msg)
 {
 	return msg[0] & 0x0f;
 }
@@ -121,11 +124,11 @@ int nvec_msg_event_type(const unsigned char* msg)
  *
  * See: nvec_push_key, nvec_pop_key, nvec_have_key
  *
- * @param nvec			nvec state struct
+ * @param nvec	nvec state struct
  */
-void nvec_process_msg(struct nvec_t* nvec)
+void nvec_process_msg(struct nvec_t *nvec)
 {
-	const unsigned char* msg = (const unsigned char*)nvec->rx_buf;
+	const unsigned char *msg = (const unsigned char *)nvec->rx_buf;
 	int event_type;
 
 	if (!nvec_msg_is_event(msg))
@@ -145,7 +148,7 @@ static inline int is_read(unsigned long status)
 
 static inline int is_ready(unsigned long status)
 {
-	return (status & I2C_SL_IRQ);
+	return status & I2C_SL_IRQ;
 }
 
 
@@ -154,15 +157,15 @@ static inline int is_ready(unsigned long status)
  * NOTE: function will wait NVEC_TIMEOUT_MIN (20ms)
  * before status check to avoid nvec hang.
  *
- * @param nvec			nvec state struct
+ * @param nvec		nvec state struct
  * @param wait_for_ec	if 1(NVEC_WAIT_FOR_EC) operation
- *						timeout is NVEC_TIMEOUT_MAX (600ms),
- *						otherwise function will return if io
- *						is not ready.
+ *			timeout is NVEC_TIMEOUT_MAX (600ms),
+ *			otherwise function will return if io
+ *			is not ready.
  *
  * @return nvec_io_* code
  */
-int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
+int nvec_do_io(struct nvec_t *nvec, int wait_for_ec)
 {
 	unsigned int poll_start_ms = 0;
 	unsigned long status;
@@ -180,9 +183,8 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 			if (is_first_iteration && !wait_for_ec)
 				return nvec_io_not_ready;
 
-			if (get_timer(poll_start_ms) > timeout_ms) {
+			if (get_timer(poll_start_ms) > timeout_ms)
 				return nvec_io_timeout;
-			}
 
 			is_first_iteration = 0;
 			udelay(100);
@@ -200,90 +202,89 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
 		}
 
 		switch (nvec->state) {
-			case NVST_BEGIN:
-				nvec->rx_pos = 0;
-				nvec->tx_pos = 0;
-				if (received != nvec->i2c_addr) {
-					error("%s: NVEC unknown addr 0x%x\n", __func__, received);
+		case NVST_BEGIN:
+			nvec->rx_pos = 0;
+			nvec->tx_pos = 0;
+			if (received != nvec->i2c_addr) {
+				error("NVEC io: unknown addr 0x%x\n", received);
+				return nvec_io_error;
+			}
+			nvec->state = NVST_CMD;
+			break;
+
+		case NVST_CMD:
+			nvec->rx_buf[nvec->rx_pos++] = (char)received;
+			nvec->state = NVST_SUBCMD;
+			break;
+
+		case NVST_SUBCMD:
+			if (status == (I2C_SL_IRQ | RNW | RCVD)) {
+				if (nvec->rx_buf[0] != 0x01) {
+					error("NVEC io: wrong read\n");
+					nvec->state = NVST_BEGIN;
 					return nvec_io_error;
 				}
-				nvec->state = NVST_CMD;
-				break;
-
-			case NVST_CMD:
-				nvec->rx_buf[nvec->rx_pos++] = (char)received;
-				nvec->state = NVST_SUBCMD;
-				break;
-
-			case NVST_SUBCMD:
-				if (status == (I2C_SL_IRQ | RNW | RCVD)) {
-					if (nvec->rx_buf[0] != 0x01) {
-						error("%s: NVEC wrong read!\n", __func__);
-						nvec->state = NVST_BEGIN;
-						return nvec_io_error;
-					}
-					nvec->state = NVST_WRITE;
-					if (nvec->tx_buf == 0) {
-						debug("%s: NVEC erro, tx buffer is 0\n", __func__);
-						nvec->tx_buf = noop;
-						nvec->tx_size = 2;
-						nvec->tx_pos = 0;
-					}
-					to_send = nvec->tx_size;
-					writel(to_send, nvec->base + I2C_SL_RCVD);
-					gpio_set_value(nvec_data.gpio, 1);
-					nvec->state = NVST_WRITE;
-				} else {
-					nvec->state = NVST_READ;
-					nvec->rx_buf[nvec->rx_pos] = (char)received;
-					++nvec->rx_pos;
+				nvec->state = NVST_WRITE;
+				if (nvec->tx_buf == 0) {
+					debug("NVEC io: error, tx buffer is 0\n");
+					nvec->tx_buf = noop;
+					nvec->tx_size = 2;
+					nvec->tx_pos = 0;
 				}
-				break;
-
-			case NVST_READ:
-				if (nvec->rx_pos >= 34) {
-					error("%s: NVEC read buffer is full.\n", __func__);
-					break;
-				}
-				nvec->rx_buf[nvec->rx_pos++] = (char)received;
-				if (status & END_TRANS) {
-					nvec_process_msg(nvec);
-					nvec->rx_pos = 0;
-					return nvec_io_read_ok;
-				}
-				break;
-
-			case NVST_WRITE_SIZE:
 				to_send = nvec->tx_size;
 				writel(to_send, nvec->base + I2C_SL_RCVD);
+				gpio_set_value(nvec_data.gpio, 1);
 				nvec->state = NVST_WRITE;
+			} else {
+				nvec->state = NVST_READ;
+				nvec->rx_buf[nvec->rx_pos] = (char)received;
+				++nvec->rx_pos;
+			}
+			break;
+
+		case NVST_READ:
+			if (nvec->rx_pos >= 34) {
+				error("NVEC io: read buffer is full\n");
 				break;
+			}
+			nvec->rx_buf[nvec->rx_pos++] = (char)received;
+			if (status & END_TRANS) {
+				nvec_process_msg(nvec);
+				nvec->rx_pos = 0;
+				return nvec_io_read_ok;
+			}
+			break;
 
-			case NVST_WRITE:
-				if (nvec->tx_pos >= nvec->tx_size) {
-					if (status & END_TRANS)
-						return nvec_io_write_ok;
+		case NVST_WRITE_SIZE:
+			to_send = nvec->tx_size;
+			writel(to_send, nvec->base + I2C_SL_RCVD);
+			nvec->state = NVST_WRITE;
+			break;
 
-					error("%s: NVEC no data to write\n", __func__);
-					return nvec_io_error;
-				}
-				to_send = nvec->tx_buf[nvec->tx_pos++];
-				writel(to_send, nvec->base + I2C_SL_RCVD);
-				if (status & END_TRANS) {
-					nvec->tx_pos = 0;
-					nvec->tx_buf = 0;
+		case NVST_WRITE:
+			if (nvec->tx_pos >= nvec->tx_size) {
+				if (status & END_TRANS)
 					return nvec_io_write_ok;
-				}
 
-				break;
+				error("NVEC io: no data to write\n");
+				return nvec_io_error;
+			}
+			to_send = nvec->tx_buf[nvec->tx_pos++];
+			writel(to_send, nvec->base + I2C_SL_RCVD);
+			if (status & END_TRANS) {
+				nvec->tx_pos = 0;
+				nvec->tx_buf = 0;
+				return nvec_io_write_ok;
+			}
 
-			default:
-				error("%s: NVEC unknown state\n", __func__);
-				break;
+			break;
+
+		default:
+			error("NVEC io: unknown state\n");
+			break;
 		}
-		if (status & END_TRANS) {
+		if (status & END_TRANS)
 			return nvec_io_retry;
-		}
 	}
 }
 
@@ -292,11 +293,11 @@ int nvec_do_io(struct nvec_t* nvec, int wait_for_ec)
  * Send request and read response. If write or read failed
  * operation will be repeated NVEC_ATTEMPTS_MAX times.
  *
- * @param buf		request data
- * @param size		request data size
+ * @param buf	request data
+ * @param size	request data size
  * @return 0 if ok, -1 on error
  */
-int nvec_do_request(char* buf, int size)
+int nvec_do_request(char *buf, int size)
 {
 	int res = 0;
 	int i = 0;
@@ -337,9 +338,9 @@ int nvec_do_request(char* buf, int size)
 /**
  * Init i2c controller to operate in slave mode.
  *
- * @param nvec			nvec state struct
+ * @param nvec	nvec state struct
  */
-static void nvec_init_i2c_slave(struct nvec_t* nvec)
+static void nvec_init_i2c_slave(struct nvec_t *nvec)
 {
 	unsigned long val;
 
@@ -349,7 +350,7 @@ static void nvec_init_i2c_slave(struct nvec_t* nvec)
 
 	/* i2c3 -> 67 */
 	clock_start_periph_pll(67, CLOCK_ID_PERIPH,
-			nvec->i2c_clk * 8);
+			       nvec->i2c_clk * 8);
 
 	reset_periph(67, 1);
 
@@ -371,25 +372,25 @@ static void nvec_init_i2c_slave(struct nvec_t* nvec)
  * @return 0 if ok, -ve on error
  */
 static int nvec_decode_config(const void *blob,
-					   struct fdt_nvec_config *config)
+			      struct fdt_nvec_config *config)
 {
 	int node;
 
 	node = fdtdec_next_compatible(blob, 0, COMPAT_NVIDIA_TEGRA20_NVEC);
 	if (node < 0) {
-		error("%s: Cannot find NVEC node in fdt\n",
-			  __func__);
+		error("Cannot find NVEC node in fdt\n");
 		return node;
 	}
 
 	config->base_addr = fdtdec_get_addr(blob, node, "reg");
 	if (config->base_addr == FDT_ADDR_T_NONE) {
-		error("%s: No NVEC controller address\n", __func__);
+		error("No NVEC controller address\n");
 		return -1;
 	}
 
-	if (fdtdec_decode_gpio(blob, node, "request-gpios", &config->request_gpio)) {
-		error("%s: No NVEC request gpio\n", __func__);
+	if (fdtdec_decode_gpio(blob, node, "request-gpios",
+			       &config->request_gpio)) {
+		error("No NVEC request gpio\n");
 		return -1;
 	}
 
@@ -416,10 +417,10 @@ int board_nvec_init(void)
 	nvec_data.tx_size = 0;
 	nvec_data.state = NVST_BEGIN;
 
-	nvec_data.gpio = cfg.request_gpio.gpio; // 170; /* PV2 */
-	nvec_data.i2c_addr = cfg.i2c_addr; // 138; /* */
-	nvec_data.i2c_clk = cfg.i2c_clk; // 80000; /* */
-	nvec_data.base = (void __iomem *)cfg.base_addr; //0x7000c500;
+	nvec_data.gpio = cfg.request_gpio.gpio;
+	nvec_data.i2c_addr = cfg.i2c_addr;
+	nvec_data.i2c_clk = cfg.i2c_clk;
+	nvec_data.base = (void __iomem *)cfg.base_addr;
 
 	debug("NVEC initialization...\n");
 
@@ -450,25 +451,24 @@ int nvec_read_events(void)
 	while (++cnt <= 8) {
 		res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
 		switch (res) {
-			case nvec_io_not_ready:
-				return 0;
+		case nvec_io_not_ready:
+			return 0;
 
-			case nvec_io_read_ok:
-			case nvec_io_retry:
-				break;
+		case nvec_io_read_ok:
+		case nvec_io_retry:
+			break;
 
-			case nvec_io_error:
-			case nvec_io_timeout:
-				debug("%s: io failed %d\n", __func__, res);
-				return 0;
+		case nvec_io_error:
+		case nvec_io_timeout:
+			debug("NVEC events: io failed %d\n", res);
+			return 0;
 
-			case nvec_io_write_ok:
-			default:
-				debug("%s: unexpected io result %d\n", __func__, res);
-				return 0;
+		case nvec_io_write_ok:
+		default:
+			debug("NVEC events: unexpected io result %d\n", res);
+			return 0;
 		}
 	}
 
 	return 0;
 }
-

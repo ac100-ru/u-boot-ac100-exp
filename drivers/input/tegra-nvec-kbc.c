@@ -73,9 +73,8 @@ int tegra_nvec_kbc_check(struct input_config *input)
 		}
 	}
 
-	if (cnt > 0) {
+	if (cnt > 0)
 		input_send_keycodes(input, fifo, cnt);
-	}
 
 	return res;
 }
@@ -111,9 +110,8 @@ int drv_keyboard_init(void)
 	char *stdinname = getenv("stdin");
 	int error;
 
-	printf("%s: \n", __func__);
 	if (input_init(&config.input, 0)) {
-		printf("%s: Cannot set up input\n", __func__);
+		printf("nvec kbc: cannot set up input\n");
 		return -1;
 	}
 	config.input.read_keys = tegra_nvec_kbc_check;
@@ -127,13 +125,14 @@ int drv_keyboard_init(void)
 	/* Register the device. init_tegra_keyboard() will be called soon */
 	error = input_stdio_register(&dev);
 	if (error) {
-		printf("failed to register nvec keyboard, %d\n", error);
+		printf("nvec kbc: failed to register stdio device, %d\n",
+		       error);
 		return error;
 	}
 #ifdef CONFIG_CONSOLE_MUX
 	error = iomux_doenv(stdin, stdinname);
 	if (error) {
-		printf("iomux_doenv failed, %d\n", error);
+		printf("nvec kbc: iomux_doenv failed, %d\n", error);
 		return error;
 	}
 #endif

@@ -174,8 +174,6 @@ int board_init(void)
 	warmboot_prepare_code(TEGRA_LP0_ADDR, TEGRA_LP0_SIZE);
 #endif
 
-	printf("nVidia board init done.");
-
 	return 0;
 }
 
