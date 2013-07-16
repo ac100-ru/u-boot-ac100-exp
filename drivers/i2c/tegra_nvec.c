@@ -28,7 +28,6 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/funcmux.h>
 #include <asm/arch-tegra/tegra_nvec.h>
-#include <asm/arch-tegra/tegra_nvec_keyboard.h>
 
 #ifndef CONFIG_TEGRA_NVEC
 #error "You should enable CONFIG_TEGRA_NVEC"
@@ -36,6 +35,7 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+struct nvec_periph devices[NVEC_LAST_MSG];
 
 /* Nvec perfroms io interval is beteween 20 and 500 ms,
 no response in 600 ms means error */
@@ -123,8 +123,12 @@ void nvec_process_msg(struct nvec_t *nvec)
 		return;
 
 	event_type = nvec_msg_event_type(msg);
-	if (event_type == NVEC_KEYBOARD)
-		nvec_process_keyboard_msg(msg);
+
+	if (event_type < NVEC_KEYBOARD || event_type >= NVEC_LAST_MSG)
+		return;
+
+	if (devices[event_type].process_msg)
+		devices[event_type].process_msg(msg);
 }
 
 
@@ -392,6 +396,7 @@ static int nvec_decode_config(const void *blob,
 int board_nvec_init(void)
 {
 	int res = 0;
+	int i;
 
 	struct fdt_nvec_config cfg;
 	if (nvec_decode_config(gd->fdt_blob, &cfg)) {
@@ -425,7 +430,9 @@ int board_nvec_init(void)
 
 	nvec_init_i2c_slave(&nvec_data);
 
-	nvec_enable_kbd_events();
+	for (i = NVEC_KEYBOARD; i < NVEC_LAST_MSG; ++i)
+		if (devices[i].start)
+			devices[i].start();
 
 	return 1;
 }
@@ -458,5 +465,17 @@ int nvec_read_events(void)
 		}
 	}
 
+	return 0;
+}
+
+
+int nvec_register_periph(int msg_type, struct nvec_periph *periph)
+{
+	if (devices[msg_type].start || devices[msg_type].process_msg) {
+		debug("Device for msg %d already registered\n", msg_type);
+		return -1;
+	}
+
+	devices[msg_type] = *periph;
 	return 0;
 }

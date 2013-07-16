@@ -57,6 +57,7 @@ enum nvec_msg_type {
 	NVEC_OEM0 = 0x0d,
 	NVEC_KB_EVT = 0x80,
 	NVEC_PS2_EVT,
+	NVEC_LAST_MSG,
 };
 
 enum nvec_event_size {
@@ -97,12 +98,20 @@ enum nvec_sleep_subcmds {
 #define MOUSE_SEND_CMD 0x01
 #define MOUSE_RESET 0xff
 
+typedef int (*periph_start)(void);
+typedef int (*periph_process_msg)(const unsigned char *);
+
+struct nvec_periph {
+	periph_start start;
+	periph_process_msg process_msg;
+};
 
 int board_nvec_init(void);
 
 int nvec_read_events(void);
 int nvec_msg_is_event(const unsigned char *msg);
 int nvec_msg_event_type(const unsigned char *msg);
+int nvec_register_periph(int msg_type, struct nvec_periph *periph);
 
 /**
  * Send request and read response. If write or read failed
