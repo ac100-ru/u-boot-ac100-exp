@@ -100,6 +100,7 @@ enum nvec_sleep_subcmds {
 
 int board_nvec_init(void);
 
+int nvec_read_events(void);
 int nvec_msg_is_event(const unsigned char *msg);
 int nvec_msg_event_type(const unsigned char *msg);
 

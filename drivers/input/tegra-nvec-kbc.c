@@ -24,7 +24,7 @@
 
 #include <common.h>
 #include <input.h>
-#include <asm/arch-tegra/tegra_nvec_events.h>
+#include <asm/arch-tegra/tegra_nvec.h>
 #include <asm/arch-tegra/tegra_nvec_keyboard.h>
 
 enum {

@@ -24,7 +24,6 @@
 #include <common.h>
 #include <circbuf.h>
 #include <asm/arch-tegra/tegra_nvec_keyboard.h>
-#include <asm/arch-tegra/tegra_nvec_keytable.h>
 #include <asm/arch-tegra/tegra_nvec.h>
 
 
@@ -106,3 +105,4 @@ void nvec_enable_kbd_events(void)
 
 	debug("NVEC: keyboard initialization finished\n");
 }
+
