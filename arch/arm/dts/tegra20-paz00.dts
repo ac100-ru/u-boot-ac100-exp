@@ -88,4 +88,12 @@
 		nvidia,panel-vdd-gpios = <&gpio 4 0>;		/* PA4 */
 		nvidia,panel-timings = <400 4 203 17 15>;
 	};
+
+	nvec {
+		compatible = "nvidia,tegra20-nvec";
+		reg = <0x7000c500 0x100>;
+		clock-frequency = <80000>;
+		request-gpios = <&gpio 170 0>; /* gpio PV2 */
+		slave-addr = <138>;
+	};
 };
