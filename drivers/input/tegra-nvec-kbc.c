@@ -23,18 +23,9 @@
  */
 
 #include <common.h>
-#include <fdtdec.h>
 #include <input.h>
-#include <key_matrix.h>
-#include <stdio_dev.h>
-#include <tegra-kbc.h>
-#include <asm/io.h>
-#include <asm/arch/clock.h>
-#include <asm/arch/funcmux.h>
-#include <asm/arch-tegra/timer.h>
 #include <asm/arch-tegra/tegra_nvec_events.h>
 #include <asm/arch-tegra/tegra_nvec_keyboard.h>
-#include <linux/input.h>
 
 enum {
 	KBC_MAX_KPENT = 8,
