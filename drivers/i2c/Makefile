@@ -29,4 +29,5 @@ obj-$(CONFIG_SYS_I2C_S3C24X0) += s3c24x0_i2c.o
 obj-$(CONFIG_SYS_I2C_SH) += sh_i2c.o
 obj-$(CONFIG_SYS_I2C_SOFT) += soft_i2c.o
 obj-$(CONFIG_SYS_I2C_TEGRA) += tegra_i2c.o
+obj-$(CONFIG_TEGRA_NVEC) += tegra_nvec.o tegra_nvec_keyboard.o
 obj-$(CONFIG_SYS_I2C_ZYNQ) += zynq_i2c.o

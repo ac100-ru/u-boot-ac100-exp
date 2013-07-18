@@ -20,6 +20,7 @@ obj-$(CONFIG_BZIP2) += bzlib_decompress.o
 obj-$(CONFIG_BZIP2) += bzlib_randtable.o
 obj-$(CONFIG_BZIP2) += bzlib_huffman.o
 obj-$(CONFIG_USB_TTY) += circbuf.o
+obj-$(CONFIG_TEGRA_NVEC) += circbuf.o
 obj-y += crc7.o
 obj-y += crc8.o
 obj-y += crc16.o
