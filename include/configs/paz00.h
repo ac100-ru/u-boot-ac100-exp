@@ -87,4 +87,6 @@
 
 #include "tegra-common-post.h"
 
+#define CONFIG_INITRD_TAG 1
+
 #endif /* __CONFIG_H */
