@@ -77,6 +77,11 @@
 #define CONFIG_TEGRA_NVEC
 #define CONFIG_TEGRA_NVEC_KEYBOARD
 
+#define CONFIG_ANSI_CONSOLE
+#define CONFIG_CMD_BOOTMENU
+#define CONFIG_MENU
+#define CONFIG_AUTOBOOT_KEYED
+
 #include "tegra-common-post.h"
 
 #define CONFIG_INITRD_TAG 1

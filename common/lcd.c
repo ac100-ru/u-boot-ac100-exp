@@ -28,6 +28,7 @@
 #include <watchdog.h>
 
 #include <splash.h>
+#include <ansi_console.h>
 
 #if defined(CONFIG_CPU_PXA25X) || defined(CONFIG_CPU_PXA27X) || \
 	defined(CONFIG_CPU_MONAHANS)
@@ -103,6 +104,7 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+void lcd_position_cursor_n(int col, int row);
 static void lcd_drawchars(ushort x, ushort y, uchar *str, int count);
 static inline void lcd_puts_xy(ushort x, ushort y, uchar *s);
 static inline void lcd_putc_xy(ushort x, ushort y, uchar  c);
@@ -114,6 +116,9 @@ static void *lcd_logo(void);
 static int lcd_getbgcolor(void);
 static void lcd_setfgcolor(int color);
 static void lcd_setbgcolor(int color);
+#ifdef CONFIG_ANSI_CONSOLE
+static void lcd_swap_colors(void);
+#endif
 
 static int lcd_color_fg;
 static int lcd_color_bg;
@@ -121,13 +126,23 @@ int lcd_line_length;
 
 char lcd_is_enabled = 0;
 
+#ifdef CONFIG_ANSI_CONSOLE
+static int console_col;
+static int console_row;
+#else
 static short console_col;
 static short console_row;
+#endif
 
 static void *lcd_console_address;
 static void *lcd_base;			/* Start of framebuffer memory	*/
 
 static char lcd_flush_dcache;	/* 1 to flush dcache after each lcd update */
+
+#ifdef CONFIG_ANSI_CONSOLE
+struct ansi_console_t ansi_console;
+#endif
+
 
 /************************************************************************/
 
@@ -155,9 +170,9 @@ void lcd_set_flush_dcache(int flush)
 
 /*----------------------------------------------------------------------*/
 
-static void console_scrollup(void)
+static void console_scrollup_n(int n)
 {
-	const int rows = CONFIG_CONSOLE_SCROLL_LINES;
+	const int rows = n;
 
 	/* Copy up rows ignoring those that will be overwritten */
 	memcpy(CONSOLE_ROW_FIRST,
@@ -187,17 +202,83 @@ static inline void console_back(void)
 		console_row * VIDEO_FONT_HEIGHT, ' ');
 }
 
+
 /*----------------------------------------------------------------------*/
 
-static inline void console_newline(void)
+static inline void console_newline_n(int n)
 {
 	console_col = 0;
 
+	console_row += n;
 	/* Check if we need to scroll the terminal */
-	if (++console_row >= CONSOLE_ROWS)
-		console_scrollup();
+	if (console_row >= CONSOLE_ROWS)
+		console_scrollup_n(CONSOLE_ROWS - console_row + 1);
 	else
 		lcd_sync();
+}
+
+static inline void console_newline(void)
+{
+	console_newline_n(1);
+}
+
+/*----------------------------------------------------------------------*/
+
+static inline void console_prevline_n(int n)
+{
+	console_col = 0;
+
+	console_row -= n;
+	/* Check if we need to scroll the terminal */
+	if (console_row < 0)
+		console_scrollup_n(1 - console_row);
+	else
+		lcd_sync();
+}
+
+static inline void console_prevline(void)
+{
+	console_prevline_n(1);
+}
+
+/*----------------------------------------------------------------------*/
+
+static inline void console_cursor_up(int n)
+{
+	console_row -= n;
+	if (console_row < 0)
+		console_row = 0;
+}
+
+static inline void console_cursor_down(int n)
+{
+	console_row += n;
+	if (console_row >= CONSOLE_ROWS)
+		console_row = CONSOLE_ROWS-1;
+}
+
+static inline void console_cursor_left(int n)
+{
+	console_col -= n;
+	if (console_col < 0)
+		console_col = 0;
+}
+
+static inline void console_cursor_right(int n)
+{
+	console_col += n;
+	if (console_col >= CONSOLE_COLS)
+		console_col = CONSOLE_COLS-1;
+}
+
+/*----------------------------------------------------------------------*/
+
+static inline void console_clear_line(int line, int begin, int end)
+{
+	short i = 0;
+	for (i = begin; i < end; ++i)
+		lcd_putc_xy(i * VIDEO_FONT_WIDTH,
+			line * VIDEO_FONT_HEIGHT, ' ');
 }
 
 /*----------------------------------------------------------------------*/
@@ -250,7 +331,11 @@ void lcd_puts(const char *s)
 	}
 
 	while (*s)
+#ifdef CONFIG_ANSI_CONSOLE
+		ansi_putc(&ansi_console, *s++);
+#else
 		lcd_putc(*s++);
+#endif
 
 	lcd_sync();
 }
@@ -509,6 +594,28 @@ static int lcd_init(void *lcdbase)
 	console_row = 1;	/* leave 1 blank line below logo */
 #endif
 
+#ifdef CONFIG_ANSI_CONSOLE
+	memset(&ansi_console, 0, sizeof(ansi_console));
+	ansi_console.putc = lcd_putc;
+#if defined(CONFIG_CONSOLE_CURSOR) || defined(CONFIG_VIDEO_SW_CURSOR)
+	ansi_console.cursor_set = lcd_set_cursor;
+	ansi_console.cursor_enable = lcd_cursor;
+	/* TODO Add on/off */
+#endif
+	ansi_console.cursor_up = console_cursor_up;
+	ansi_console.cursor_down = console_cursor_down;
+	ansi_console.cursor_left = console_cursor_left;
+	ansi_console.cursor_right = console_cursor_right;
+	ansi_console.previous_line = console_prevline_n;
+	ansi_console.new_line = console_newline_n;
+	ansi_console.set_position = lcd_position_cursor_n;
+	ansi_console.clear_line = console_clear_line;
+	ansi_console.clear = lcd_clear;
+	ansi_console.swap_colors = lcd_swap_colors;
+	ansi_console.console_col = &console_col;
+	ansi_console.console_row = &console_row;
+#endif /* CONFIG_CONSOLE_ANSI */
+
 	return 0;
 }
 
@@ -573,6 +680,17 @@ static int lcd_getbgcolor(void)
 {
 	return lcd_color_bg;
 }
+
+/*----------------------------------------------------------------------*/
+
+#ifdef CONFIG_ANSI_CONSOLE
+static void lcd_swap_colors(void)
+{
+	int tmp = lcd_color_bg;
+	lcd_color_bg = lcd_color_fg;
+	lcd_color_fg = tmp;
+}
+#endif
 
 /************************************************************************/
 /* ** Chipset depending Bitmap / Logo stuff...                          */
@@ -1124,6 +1242,11 @@ void lcd_position_cursor(unsigned col, unsigned row)
 {
 	console_col = min(col, CONSOLE_COLS - 1);
 	console_row = min(row, CONSOLE_ROWS - 1);
+}
+
+void lcd_position_cursor_n(int row, int col)
+{
+	lcd_position_cursor((unsigned)col, (unsigned)row);
 }
 
 int lcd_get_pixel_width(void)
