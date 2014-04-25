@@ -7,6 +7,9 @@
 
 obj-$(CONFIG_I8042_KBD) += i8042.o
 obj-$(CONFIG_TEGRA_KEYBOARD) += tegra-kbc.o
+ifdef CONFIG_SYS_I2C_TEGRA_NVEC
+obj-$(CONFIG_TEGRA_NVEC_KEYBOARD) += tegra-nvec-kbc.o
+endif
 obj-$(CONFIG_CROS_EC_KEYB) += cros_ec_keyb.o
 ifdef CONFIG_PS2KBD
 obj-y += keyboard.o pc_keyb.o
