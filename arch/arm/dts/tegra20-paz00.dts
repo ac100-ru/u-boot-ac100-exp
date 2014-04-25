@@ -40,7 +40,13 @@
 	};
 
 	i2c@7000c500 {
-		status = "disabled";
+		status = "okay";
+		clock-frequency = <40000>;
+		slave-addr = <138>;
+		nvec {
+			compatible = "nvidia,tegra20-nvec";
+			request-gpios = <&gpio 170 0>; /* gpio PV2 */
+		};
 	};
 
 	i2c@7000d000 {
