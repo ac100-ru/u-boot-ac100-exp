@@ -38,6 +38,7 @@ static const char * const compat_names[COMPAT_COUNT] = {
 	COMPAT(NVIDIA_TEGRA20_SDMMC, "nvidia,tegra20-sdhci"),
 	COMPAT(NVIDIA_TEGRA20_SFLASH, "nvidia,tegra20-sflash"),
 	COMPAT(NVIDIA_TEGRA20_SLINK, "nvidia,tegra20-slink"),
+	COMPAT(NVIDIA_TEGRA20_NVEC, "nvidia,tegra20-nvec"),
 	COMPAT(NVIDIA_TEGRA114_SPI, "nvidia,tegra114-spi"),
 	COMPAT(SMSC_LAN9215, "smsc,lan9215"),
 	COMPAT(SAMSUNG_EXYNOS5_SROMC, "samsung,exynos-sromc"),

@@ -37,6 +37,9 @@
 #include <asm/arch-tegra/tegra_mmc.h>
 #include <asm/arch-tegra/mmc.h>
 #endif
+#ifdef CONFIG_SYS_I2C_TEGRA_NVEC
+#include <asm/arch-tegra/tegra_nvec.h>
+#endif
 #include <i2c.h>
 #include <spi.h>
 #include "emc.h"
@@ -197,10 +200,19 @@ int board_early_init_f(void)
 
 int board_late_init(void)
 {
+	__maybe_unused int err;
+
 #ifdef CONFIG_LCD
 	/* Make sure we finish initing the LCD */
 	tegra_lcd_check_next_stage(gd->fdt_blob, 1);
 #endif
+
+#ifdef CONFIG_SYS_I2C_TEGRA_NVEC
+	err = board_nvec_init();
+	if (err)
+		debug("NVEC controller init failed: %d\n", err);
+#endif
+
 	return 0;
 }
 
