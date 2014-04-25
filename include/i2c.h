@@ -55,6 +55,20 @@
 #define CONFIG_SYS_SPD_BUS_NUM		0
 #endif
 
+struct i2c_transaction {
+	char rx_buf[34];
+	int rx_pos;
+
+	char tx_buf[34];
+	int tx_pos;
+	int tx_size;
+
+	unsigned int start_timeout;
+	unsigned int timeout;
+
+	int res;
+};
+
 struct i2c_adapter {
 	void		(*init)(struct i2c_adapter *adap, int speed,
 				int slaveaddr);
@@ -65,6 +79,8 @@ struct i2c_adapter {
 	int		(*write)(struct i2c_adapter *adap, uint8_t chip,
 				uint addr, int alen, uint8_t *buffer,
 				int len);
+	int		(*slave_io)(struct i2c_adapter *adap,
+				struct i2c_transaction *trans);
 	uint		(*set_bus_speed)(struct i2c_adapter *adap,
 				uint speed);
 	int		speed;
@@ -82,12 +98,13 @@ struct i2c_adapter {
 		.probe		=	_probe, \
 		.read		=	_read, \
 		.write		=	_write, \
+		.slave_io	=	0, \
 		.set_bus_speed	=	_set_speed, \
 		.speed		=	_speed, \
 		.slaveaddr	=	_slaveaddr, \
 		.init_done	=	0, \
 		.hwadapnr	=	_hwadapnr, \
-		.name		=	#_name \
+		.name		=	#_name, \
 };
 
 #define U_BOOT_I2C_ADAP_COMPLETE(_name, _init, _probe, _read, _write, \
@@ -451,4 +468,15 @@ int i2c_get_bus_num_fdt(int node);
  * @return 0 if port was reset, -1 if not found
  */
 int i2c_reset_port_fdt(const void *blob, int node);
+
+/**
+ * Perform I2C transaction with master device.
+ *
+ * @param trans  I2C transaction object
+ * @return 0 if succeeded, -1 if not supported,
+ *         1 if not ready, 2 if operation timed out,
+ *         3 if not our packet, other - unknown error.
+ */
+int i2c_slave_io(struct i2c_transaction *trans);
+
 #endif	/* _I2C_H_ */

@@ -395,6 +395,19 @@ void i2c_reg_write(uint8_t addr, uint8_t reg, uint8_t val)
 	i2c_write(addr, reg, 1, &val, 1);
 }
 
+int i2c_slave_io(struct i2c_transaction *trans)
+{
+	struct i2c_adapter *cur = I2C_ADAP;
+
+	if (!cur->slave_io) {
+		printf("Error: slave IO is not supported on adap %d\n",
+		       cur->hwadapnr);
+		return -1;
+	}
+
+	return cur->slave_io(cur, trans);
+}
+
 void __i2c_init(int speed, int slaveaddr)
 {
 	i2c_init_bus(i2c_get_bus_num(), speed, slaveaddr);
