@@ -22,6 +22,7 @@ DECLARE_GLOBAL_DATA_PTR;
 /* Information about i2c controller */
 struct i2c_bus {
 	int			id;
+	int			node;
 	enum periph_id		periph_id;
 	int			speed;
 	int			pinmux_config;
@@ -30,9 +31,30 @@ struct i2c_bus {
 	int			is_dvc;	/* DVC type, rather than I2C */
 	int			is_scs;	/* single clock source (T114+) */
 	int			inited;	/* bus is inited */
+	int			slave_addr;
 };
 
 static struct i2c_bus i2c_controllers[TEGRA_I2C_NUM_CONTROLLERS];
+
+/**
+ * Init i2c controller to operate in slave mode.
+ *
+ * @param bus	i2c bus/controller state struct
+ */
+static void set_slave_mode(struct i2c_bus *bus)
+{
+	unsigned long val;
+
+	val = I2C_CNFG_NEW_MASTER_FSM_MASK | I2C_CNFG_PACKET_MODE_MASK |
+	    I2C_CNFG_DEBOUNCE_CNT_MASK;
+	writel(val, &bus->regs->cnfg);
+
+	writel(I2C_SL_CNFG_NEWSL_MASK, &bus->regs->sl_cnfg);
+	writel(0x1E, &bus->regs->sl_delay_count);
+
+	writel(bus->slave_addr >> 1, &bus->regs->sl_addr1);
+	writel(0, &bus->regs->sl_addr2);
+}
 
 static void set_packet_mode(struct i2c_bus *i2c_bus)
 {
@@ -59,8 +81,12 @@ static void i2c_reset_controller(struct i2c_bus *i2c_bus)
 	/* Reset I2C controller. */
 	reset_periph(i2c_bus->periph_id, 1);
 
-	/* re-program config register to packet mode */
-	set_packet_mode(i2c_bus);
+	if (i2c_bus->slave_addr == 0) {
+		/* re-program config register to packet mode */
+		set_packet_mode(i2c_bus);
+	} else {
+		set_slave_mode(i2c_bus);
+	}
 }
 
 static void i2c_init_controller(struct i2c_bus *i2c_bus)
@@ -195,6 +221,121 @@ static int wait_for_transfer_complete(struct i2c_control *control)
 
 	return -1;
 }
+
+
+#define I2C_SL_IRQ		(1<<3)
+#define END_TRANS		(1<<4)
+#define RCVD			(1<<2)
+#define RNW			(1<<1)
+
+
+static inline int is_ready(unsigned long status)
+{
+	return status & I2C_SL_IRQ;
+}
+
+static inline int is_read(unsigned long status)
+{
+	return (status & RNW) == 0;
+}
+
+static inline int is_trans_start(unsigned long status)
+{
+	return status & RCVD;
+}
+
+static inline int is_trans_end(unsigned long status)
+{
+	return status & END_TRANS;
+}
+
+
+/**
+ * Send or receive packet in slave mode.
+ *
+ * @param i2c_bus	pointer to bus structure
+ * @param trans		I2C transaction object
+ *
+ * @return	0 if succeeded,
+ *		1 if not ready,
+ *		2 if operation timed out,
+ *		3 if not our packet,
+ *		other - unknown error.
+ */
+static int slave_send_recv_packets(struct i2c_bus *i2c_bus,
+				   struct i2c_transaction *trans)
+{
+	unsigned int poll_start_ms = 0;
+	unsigned long status;
+
+	unsigned int received = 0;
+	unsigned int to_send = 0;
+	unsigned int timer_ms = 0;
+	int addr = -1;
+
+	poll_start_ms = get_timer(0);
+
+	while (1) {
+		status = readl(&i2c_bus->regs->sl_status);
+		if (!is_ready(status)) {
+			timer_ms = get_timer(poll_start_ms);
+			if (addr != i2c_bus->slave_addr &&
+			    trans->start_timeout &&
+			    timer_ms > trans->start_timeout) {
+				trans->res = 1;
+				return 1; /*not ready*/
+			}
+
+			if (timer_ms > trans->timeout) {
+				trans->res = 2;
+				return 2; /*timeout*/
+			}
+
+			udelay(100);
+			continue;
+		}
+
+		if (!is_trans_start(status) && addr != i2c_bus->slave_addr) {
+			trans->res = 3;
+			return 3; /* not our packet, retry */
+		}
+
+		if (is_trans_start(status)) {
+			if (!is_read(status) && addr != i2c_bus->slave_addr) {
+				trans->res = 3;
+				return 3; /* not our packet, retry */
+			}
+			if (is_read(status)) {
+				addr = readl(&i2c_bus->regs->sl_rcvd);
+				trans->rx_buf[trans->rx_pos++] = addr;
+				continue;
+			}
+		}
+
+		if (is_trans_end(status)) {
+			/* Check for repeated start */
+			if (!is_trans_start(status)) {
+				trans->res = 0;
+				return 0;
+			}
+		}
+
+		if (is_read(status)) {
+			/* TODO Check sizes */
+			received = readl(&i2c_bus->regs->sl_rcvd);
+			trans->rx_buf[trans->rx_pos++] = received;
+		} else {
+			/* TODO Check sizes */
+			to_send = trans->tx_buf[trans->tx_pos++];
+			writel(to_send, &i2c_bus->regs->sl_rcvd);
+		}
+	}
+
+	/* not reachable */
+	trans->res = 4;
+	return 4;
+}
+
 
 static int send_recv_packets(struct i2c_bus *i2c_bus,
 			     struct i2c_trans_info *trans)
@@ -351,6 +492,7 @@ static unsigned int tegra_i2c_set_bus_speed(struct i2c_adapter *adap,
 
 static int i2c_get_config(const void *blob, int node, struct i2c_bus *i2c_bus)
 {
+	i2c_bus->node = node;
 	i2c_bus->regs = (struct i2c_ctlr *)fdtdec_get_addr(blob, node, "reg");
 
 	/*
@@ -372,6 +514,8 @@ static int i2c_get_config(const void *blob, int node, struct i2c_bus *i2c_bus)
 	 */
 	if (i2c_bus->periph_id == -1)
 		return -FDT_ERR_NOTFOUND;
+
+	i2c_bus->slave_addr = fdtdec_get_int(blob, node, "slave-addr", -1);
 
 	return 0;
 }
@@ -430,6 +574,28 @@ static int process_nodes(const void *blob, int node_list[], int count,
 	return 0;
 }
 
+static int tegra_i2c_slave_io(struct i2c_adapter *adap,
+			      struct i2c_transaction *trans)
+{
+	struct i2c_bus *bus;
+	debug("tegra_i2c_slave_io: hwadapnr=%d\n", adap->hwadapnr);
+
+	bus = tegra_i2c_get_bus(adap);
+	if (!bus) {
+		error("tegra_i2c_slave_io: no bus for adapter %d\n",
+		      adap->hwadapnr);
+		return -1;
+	}
+
+	if (!bus->slave_addr) {
+		error("tegra_i2c_slave_io: adapter %d isn't in slave mode\n",
+		      adap->hwadapnr);
+		return -2;
+	}
+
+	return slave_send_recv_packets(bus, trans);
+}
+
 /* Sadly there is no error return from this function */
 void i2c_init_board(void)
 {
@@ -461,11 +627,20 @@ void i2c_init_board(void)
 
 static void tegra_i2c_init(struct i2c_adapter *adap, int speed, int slaveaddr)
 {
+	struct i2c_bus *bus;
+
 	/* No i2c support prior to relocation */
 	if (!(gd->flags & GD_FLG_RELOC))
 		return;
 
-	/* This will override the speed selected in the fdt for that port */
+	bus = tegra_i2c_get_bus(adap);
+	if (bus) {
+		adap->slave_io = tegra_i2c_slave_io;
+		debug("i2c_init: ignore static init for adapter %d\n",
+		      adap->hwadapnr);
+		return;
+	}
+
 	debug("i2c_init(speed=%u, slaveaddr=0x%x)\n", speed, slaveaddr);
 	i2c_set_bus_speed(speed);
 }
@@ -620,6 +795,24 @@ int tegra_i2c_get_dvc_bus_num(void)
 		if (bus->inited && bus->is_dvc)
 			return i;
 	}
+
+	return -1;
+}
+
+/**
+ * Find the I2C bus number by given a FDT I2C node.
+ *
+ * @param blob  Device tree blbo
+ * @param node  FDT I2C node to find
+ * @return the number of I2C bus (zero based), or -1 on error
+ */
+int i2c_get_bus_num_fdt(int node)
+{
+	int i;
+
+	for (i = 0; i < TEGRA_I2C_NUM_CONTROLLERS; ++i)
+		if (i2c_controllers[i].node == node)
+			return i2c_controllers[i].id;
 
 	return -1;
 }
