@@ -200,6 +200,7 @@ obj-$(CONFIG_CMD_ZFS) += cmd_zfs.o
 # others
 obj-$(CONFIG_BOOTSTAGE) += bootstage.o
 obj-$(CONFIG_CONSOLE_MUX) += iomux.o
+obj-$(CONFIG_ANSI_CONSOLE) += ansi_console.o
 obj-y += flash.o
 obj-$(CONFIG_CMD_KGDB) += kgdb.o kgdb_stubs.o
 obj-$(CONFIG_I2C_EDID) += edid.o

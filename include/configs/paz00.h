@@ -81,6 +81,11 @@
 #define CONFIG_SYS_I2C_INIT_BOARD
 #define CONFIG_SYS_I2C_TEGRA_NVEC
 
+#define CONFIG_ANSI_CONSOLE
+#define CONFIG_CMD_BOOTMENU
+#define CONFIG_MENU
+#define CONFIG_AUTOBOOT_KEYED
+
 #include "tegra-common-post.h"
 
 #endif /* __CONFIG_H */
