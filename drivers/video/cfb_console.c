@@ -90,6 +90,7 @@
 #include <version.h>
 #include <malloc.h>
 #include <linux/compiler.h>
+#include <ansi_console.h>
 
 /*
  * Console device defines with SMI graphic
@@ -371,10 +372,7 @@ static u32 eorx, fgx, bgx;	/* color pats */
 static int cfb_do_flush_cache;
 
 #ifdef CONFIG_CFB_CONSOLE_ANSI
-static char ansi_buf[10];
-static int ansi_buf_size;
-static int ansi_colors_need_revert;
-static int ansi_cursor_hidden;
+struct ansi_console_t ansi_console;
 #endif
 
 static const int video_font_draw_table8[] = {
@@ -866,7 +864,7 @@ static void console_swap_colors(void)
 
 static inline int console_cursor_is_visible(void)
 {
-	return !ansi_cursor_hidden;
+	return !ansi_console.ansi_cursor_hidden;
 }
 #else
 static inline int console_cursor_is_visible(void)
@@ -947,210 +945,7 @@ static void parse_putc(const char c)
 void video_putc(const char c)
 {
 #ifdef CONFIG_CFB_CONSOLE_ANSI
-	int i;
-
-	if (c == 27) {
-		for (i = 0; i < ansi_buf_size; ++i)
-			parse_putc(ansi_buf[i]);
-		ansi_buf[0] = 27;
-		ansi_buf_size = 1;
-		return;
-	}
-
-	if (ansi_buf_size > 0) {
-		/*
-		 * 0 - ESC
-		 * 1 - [
-		 * 2 - num1
-		 * 3 - ..
-		 * 4 - ;
-		 * 5 - num2
-		 * 6 - ..
-		 * - cchar
-		 */
-		int next = 0;
-
-		int flush = 0;
-		int fail = 0;
-
-		int num1 = 0;
-		int num2 = 0;
-		int cchar = 0;
-
-		ansi_buf[ansi_buf_size++] = c;
-
-		if (ansi_buf_size >= sizeof(ansi_buf))
-			fail = 1;
-
-		for (i = 0; i < ansi_buf_size; ++i) {
-			if (fail)
-				break;
-
-			switch (next) {
-			case 0:
-				if (ansi_buf[i] == 27)
-					next = 1;
-				else
-					fail = 1;
-				break;
-
-			case 1:
-				if (ansi_buf[i] == '[')
-					next = 2;
-				else
-					fail = 1;
-				break;
-
-			case 2:
-				if (ansi_buf[i] >= '0' && ansi_buf[i] <= '9') {
-					num1 = ansi_buf[i]-'0';
-					next = 3;
-				} else if (ansi_buf[i] != '?') {
-					--i;
-					num1 = 1;
-					next = 4;
-				}
-				break;
-
-			case 3:
-				if (ansi_buf[i] >= '0' && ansi_buf[i] <= '9') {
-					num1 *= 10;
-					num1 += ansi_buf[i]-'0';
-				} else {
-					--i;
-					next = 4;
-				}
-				break;
-
-			case 4:
-				if (ansi_buf[i] != ';') {
-					--i;
-					next = 7;
-				} else
-					next = 5;
-				break;
-
-			case 5:
-				if (ansi_buf[i] >= '0' && ansi_buf[i] <= '9') {
-					num2 = ansi_buf[i]-'0';
-					next = 6;
-				} else
-					fail = 1;
-				break;
-
-			case 6:
-				if (ansi_buf[i] >= '0' && ansi_buf[i] <= '9') {
-					num2 *= 10;
-					num2 += ansi_buf[i]-'0';
-				} else {
-					--i;
-					next = 7;
-				}
-				break;
-
-			case 7:
-				if ((ansi_buf[i] >= 'A' && ansi_buf[i] <= 'H')
-					|| ansi_buf[i] == 'J'
-					|| ansi_buf[i] == 'K'
-					|| ansi_buf[i] == 'h'
-					|| ansi_buf[i] == 'l'
-					|| ansi_buf[i] == 'm') {
-					cchar = ansi_buf[i];
-					flush = 1;
-				} else
-					fail = 1;
-				break;
-			}
-		}
-
-		if (fail) {
-			for (i = 0; i < ansi_buf_size; ++i)
-				parse_putc(ansi_buf[i]);
-			ansi_buf_size = 0;
-			return;
-		}
-
-		if (flush) {
-			if (!ansi_cursor_hidden)
-				CURSOR_OFF;
-			ansi_buf_size = 0;
-			switch (cchar) {
-			case 'A':
-				/* move cursor num1 rows up */
-				console_cursor_up(num1);
-				break;
-			case 'B':
-				/* move cursor num1 rows down */
-				console_cursor_down(num1);
-				break;
-			case 'C':
-				/* move cursor num1 columns forward */
-				console_cursor_right(num1);
-				break;
-			case 'D':
-				/* move cursor num1 columns back */
-				console_cursor_left(num1);
-				break;
-			case 'E':
-				/* move cursor num1 rows up at begin of row */
-				console_previousline(num1);
-				break;
-			case 'F':
-				/* move cursor num1 rows down at begin of row */
-				console_newline(num1);
-				break;
-			case 'G':
-				/* move cursor to column num1 */
-				console_cursor_set_position(-1, num1-1);
-				break;
-			case 'H':
-				/* move cursor to row num1, column num2 */
-				console_cursor_set_position(num1-1, num2-1);
-				break;
-			case 'J':
-				/* clear console and move cursor to 0, 0 */
-				console_clear();
-				console_cursor_set_position(0, 0);
-				break;
-			case 'K':
-				/* clear line */
-				if (num1 == 0)
-					console_clear_line(console_row,
-							console_col,
-							CONSOLE_COLS-1);
-				else if (num1 == 1)
-					console_clear_line(console_row,
-							0, console_col);
-				else
-					console_clear_line(console_row,
-							0, CONSOLE_COLS-1);
-				break;
-			case 'h':
-				ansi_cursor_hidden = 0;
-				break;
-			case 'l':
-				ansi_cursor_hidden = 1;
-				break;
-			case 'm':
-				if (num1 == 0) { /* reset swapped colors */
-					if (ansi_colors_need_revert) {
-						console_swap_colors();
-						ansi_colors_need_revert = 0;
-					}
-				} else if (num1 == 7) { /* once swap colors */
-					if (!ansi_colors_need_revert) {
-						console_swap_colors();
-						ansi_colors_need_revert = 1;
-					}
-				}
-				break;
-			}
-			if (!ansi_cursor_hidden)
-				CURSOR_SET;
-		}
-	} else {
-		parse_putc(c);
-	}
+	ansi_putc(&ansi_console, c);
 #else
 	parse_putc(c);
 #endif
@@ -2232,6 +2027,32 @@ static int video_init(void)
 
 	if (cfb_do_flush_cache)
 		flush_cache(VIDEO_FB_ADRS, VIDEO_SIZE);
+
+	memset(&ansi_console, 0, sizeof(ansi_console));
+	ansi_console.putc = parse_putc;
+
+#if defined(CONFIG_CONSOLE_CURSOR) || defined(CONFIG_VIDEO_SW_CURSOR)
+	ansi_console.cursor_set = video_set_cursor;
+	ansi_console.cursor_enable = console_cursor;
+	/* TODO Add on/off */
+#endif
+	ansi_console.cursor_up = console_cursor_up;
+	ansi_console.cursor_up = console_cursor_up;
+	ansi_console.cursor_down = console_cursor_down;
+	ansi_console.cursor_left = console_cursor_left;
+	ansi_console.cursor_right = console_cursor_right;
+	ansi_console.previous_line = console_previousline;
+	ansi_console.new_line = console_newline;
+
+	ansi_console.set_position = console_cursor_set_position;
+
+	ansi_console.clear_line = console_clear_line;
+
+	ansi_console.clear = console_clear;
+	ansi_console.swap_colors = console_swap_colors;
+
+	ansi_console.console_col = &console_col;
+	ansi_console.console_row = &console_row;
 
 	return 0;
 }

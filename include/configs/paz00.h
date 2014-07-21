@@ -72,6 +72,11 @@
 #define CONFIG_SYS_WHITE_ON_BLACK
 #define CONFIG_CONSOLE_SCROLL_LINES	10
 
+#define CONFIG_ANSI_CONSOLE
+#define CONFIG_CMD_BOOTMENU
+#define CONFIG_MENU
+#define CONFIG_AUTOBOOT_KEYED
+
 #include "tegra-common-post.h"
 
 #endif /* __CONFIG_H */
