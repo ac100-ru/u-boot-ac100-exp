@@ -11,30 +11,24 @@
 
 #include <common.h>
 
-typedef void (ansi_console_f)(void);
-typedef void (ansi_console_char_f)(const char c);
-typedef void (ansi_console_cursor_f)(int n);
-typedef void (ansi_console_pos_f)(int x, int y);
-typedef void (ansi_console_line_f)(int n, int start, int end);
-
 struct ansi_console_t {
-	ansi_console_char_f* putc;
+	void (*putc)(const char c);
 
-	ansi_console_f*        cursor_set;
-	ansi_console_cursor_f* cursor_enable;
-	ansi_console_cursor_f* cursor_up;
-	ansi_console_cursor_f* cursor_down;
-	ansi_console_cursor_f* cursor_left;
-	ansi_console_cursor_f* cursor_right;
-	ansi_console_cursor_f* previous_line;
-	ansi_console_cursor_f* new_line;
+	void (*cursor_set)(void);
+	void (*cursor_enable)(int enable);
+	void (*cursor_up)(int n);
+	void (*cursor_down)(int n);
+	void (*cursor_left)(int n);
+	void (*cursor_right)(int n);
+	void (*previous_line)(int n);
+	void (*new_line)(int n);
 
-	ansi_console_pos_f*    set_position;
+	void (*set_position)(int x, int y);
 
-	ansi_console_line_f*   clear_line;
+	void (*clear_line)(int n, int start, int end);
 
-	ansi_console_f*        clear;
-	ansi_console_f*        swap_colors;
+	void (*clear)(void);
+	void (*swap_colors)(void);
 
 	int* console_col;
 	int* console_row;
