@@ -14,8 +14,6 @@
 struct ansi_console_t {
 	void (*putc)(const char c);
 
-	void (*cursor_set)(void);
-	void (*cursor_enable)(int enable);
 	void (*cursor_up)(int n);
 	void (*cursor_down)(int n);
 	void (*cursor_left)(int n);
@@ -23,12 +21,16 @@ struct ansi_console_t {
 	void (*previous_line)(int n);
 	void (*new_line)(int n);
 
-	void (*set_position)(int x, int y);
+	void (*set_position)(int row, int col);
 
-	void (*clear_line)(int n, int start, int end);
+	void (*clear_line)(int line, int begin, int end);
 
 	void (*clear)(void);
 	void (*swap_colors)(void);
+
+	/* Optional */
+	void (*cursor_set)(void);
+	void (*cursor_enable)(int state);
 
 	int* console_col;
 	int* console_row;
