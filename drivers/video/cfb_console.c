@@ -2034,7 +2034,6 @@ static int video_init(void)
 #if defined(CONFIG_CONSOLE_CURSOR) || defined(CONFIG_VIDEO_SW_CURSOR)
 	ansi_console.cursor_set = video_set_cursor;
 	ansi_console.cursor_enable = console_cursor;
-	/* TODO Add on/off */
 #endif
 	ansi_console.cursor_up = console_cursor_up;
 	ansi_console.cursor_up = console_cursor_up;
