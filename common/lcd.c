@@ -614,9 +614,9 @@ static int lcd_init(void *lcdbase)
 	memset(&ansi_console, 0, sizeof(ansi_console));
 	ansi_console.putc = lcd_putc;
 #if defined(CONFIG_CONSOLE_CURSOR) || defined(CONFIG_VIDEO_SW_CURSOR)
-	ansi_console.cursor_set = lcd_set_cursor;
-	ansi_console.cursor_enable = lcd_cursor;
-	/* TODO Add on/off */
+#warning Cursor is not implemented for LCD ANSI console
+	ansi_console.cursor_set = NULL;
+	ansi_console.cursor_enable = NULL;
 #endif
 	ansi_console.cursor_up = console_cursor_up;
 	ansi_console.cursor_down = console_cursor_down;
@@ -1253,6 +1253,7 @@ static int on_splashimage(const char *name, const char *value, enum env_op op,
 U_BOOT_ENV_CALLBACK(splashimage, on_splashimage);
 #endif
 
+/* TODO Remove semi-duplicate */
 void lcd_position_cursor(unsigned col, unsigned row)
 {
 	console_col = min(col, CONSOLE_COLS - 1);
