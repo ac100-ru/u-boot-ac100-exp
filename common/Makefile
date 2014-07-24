@@ -200,13 +200,12 @@ obj-$(CONFIG_CMD_ZFS) += cmd_zfs.o
 # others
 obj-$(CONFIG_BOOTSTAGE) += bootstage.o
 obj-$(CONFIG_CONSOLE_MUX) += iomux.o
-obj-$(CONFIG_ANSI_CONSOLE) += ansi_console.o
 obj-y += flash.o
 obj-$(CONFIG_CMD_KGDB) += kgdb.o kgdb_stubs.o
 obj-$(CONFIG_I2C_EDID) += edid.o
 obj-$(CONFIG_KALLSYMS) += kallsyms.o
 obj-y += splash.o
-obj-$(CONFIG_LCD) += lcd.o
+obj-$(CONFIG_LCD) += lcd.o ansi_console.o
 obj-$(CONFIG_LYNXKDI) += lynxkdi.o
 obj-$(CONFIG_MENU) += menu.o
 obj-$(CONFIG_MODEM_SUPPORT) += modem.o

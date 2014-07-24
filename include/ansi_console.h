@@ -12,11 +12,7 @@
 #include <common.h>
 
 struct ansi_console_t {
-	void (*putc)(const char c);
-	void (*sync)(void);
-	void (*scroll)(int n);
-
-	void (*new_line)(int n);
+	void (*putc_cr)(int col, int row, const char c);
 
 	void (*clear_line)(int line, int begin, int end);
 
@@ -26,6 +22,8 @@ struct ansi_console_t {
 	/* Optional */
 	void (*cursor_set)(void);
 	void (*cursor_enable)(int state);
+	void (*sync)(void);
+	void (*scroll)(int n);
 
 	int cols;
 	int rows;

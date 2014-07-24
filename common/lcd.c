@@ -120,9 +120,7 @@ static void *lcd_logo(void);
 static int lcd_getbgcolor(void);
 static void lcd_setfgcolor(int color);
 static void lcd_setbgcolor(int color);
-#ifdef CONFIG_ANSI_CONSOLE
 static void lcd_swap_colors(void);
-#endif
 
 static int lcd_color_fg;
 static int lcd_color_bg;
@@ -130,22 +128,15 @@ int lcd_line_length;
 
 char lcd_is_enabled = 0;
 
-#ifdef CONFIG_ANSI_CONSOLE
 static int console_col;
 static int console_row;
-#else
-static short console_col;
-static short console_row;
-#endif
 
 static void *lcd_console_address;
 static void *lcd_base;			/* Start of framebuffer memory	*/
 
 static char lcd_flush_dcache;	/* 1 to flush dcache after each lcd update */
 
-#ifdef CONFIG_ANSI_CONSOLE
-struct ansi_console_t ansi_console;
-#endif
+static struct ansi_console_t ansi_console;
 
 
 /************************************************************************/
@@ -181,7 +172,7 @@ void lcd_set_flush_dcache(int flush)
 
 /*----------------------------------------------------------------------*/
 
-static void console_scrollup_n(int n)
+static void console_scrollup(int n)
 {
 	const int rows = n;
 
@@ -200,38 +191,6 @@ static void console_scrollup_n(int n)
 }
 
 /*----------------------------------------------------------------------*/
-
-static inline void console_back(void)
-{
-	if (--console_col < 0) {
-		console_col = CONSOLE_COLS-1 ;
-		if (--console_row < 0)
-			console_row = 0;
-	}
-
-	lcd_putc_xy(console_col * VIDEO_FONT_WIDTH,
-		console_row * VIDEO_FONT_HEIGHT, ' ');
-}
-
-
-/*----------------------------------------------------------------------*/
-
-static inline void console_newline_n(int n)
-{
-	console_col = 0;
-
-	console_row += n;
-	/* Check if we need to scroll the terminal */
-	if (console_row >= CONSOLE_ROWS)
-		console_scrollup_n(CONSOLE_ROWS - console_row + 1);
-	else
-		lcd_sync();
-}
-
-static inline void console_newline(void)
-{
-	console_newline_n(1);
-}
 
 /*----------------------------------------------------------------------*/
 
@@ -253,33 +212,7 @@ void lcd_putc(const char c)
 		return;
 	}
 
-	switch (c) {
-	case '\r':
-		console_col = 0;
-
-		return;
-	case '\n':
-		console_newline();
-
-		return;
-	case '\t':	/* Tab (8 chars alignment) */
-		console_col +=  8;
-		console_col &= ~7;
-
-		if (console_col >= CONSOLE_COLS)
-			console_newline();
-
-		return;
-	case '\b':
-		console_back();
-
-		return;
-	default:
-		lcd_putc_xy(console_col * VIDEO_FONT_WIDTH,
-			console_row * VIDEO_FONT_HEIGHT, c);
-		if (++console_col >= CONSOLE_COLS)
-			console_newline();
-	}
+	ansi_putc(&ansi_console, c);
 }
 
 /*----------------------------------------------------------------------*/
@@ -293,11 +226,7 @@ void lcd_puts(const char *s)
 	}
 
 	while (*s)
-#ifdef CONFIG_ANSI_CONSOLE
-		ansi_putc(&ansi_console, *s++);
-#else
 		lcd_putc(*s++);
-#endif
 
 	lcd_sync();
 }
@@ -392,6 +321,13 @@ static inline void lcd_puts_xy(ushort x, ushort y, uchar *s)
 static inline void lcd_putc_xy(ushort x, ushort y, uchar c)
 {
 	lcd_drawchars(x, y, &c, 1);
+}
+
+/*----------------------------------------------------------------------*/
+
+static inline void lcd_putc_cr(int col, int row, const char c)
+{
+	lcd_putc_xy(col * VIDEO_FONT_WIDTH, row * VIDEO_FONT_HEIGHT, (uchar)c);
 }
 
 /************************************************************************/
@@ -560,9 +496,8 @@ static int lcd_init(void *lcdbase)
 	console_row = 1;	/* leave 1 blank line below logo */
 #endif
 
-#ifdef CONFIG_ANSI_CONSOLE
 	memset(&ansi_console, 0, sizeof(ansi_console));
-	ansi_console.putc = lcd_putc;
+	ansi_console.putc_cr = lcd_putc_cr;
 	ansi_console.cols = CONSOLE_COLS;
 	ansi_console.rows = CONSOLE_ROWS;
 #if defined(CONFIG_CONSOLE_CURSOR) || defined(CONFIG_VIDEO_SW_CURSOR)
@@ -571,14 +506,12 @@ static int lcd_init(void *lcdbase)
 	ansi_console.cursor_enable = NULL;
 #endif
 	ansi_console.sync = lcd_sync;
-	ansi_console.scroll = console_scrollup_n;
-	ansi_console.new_line = console_newline_n;
+	ansi_console.scroll = console_scrollup;
 	ansi_console.clear_line = console_clear_line;
 	ansi_console.clear = lcd_clear;
 	ansi_console.swap_colors = lcd_swap_colors;
 	ansi_console.console_col = &console_col;
 	ansi_console.console_row = &console_row;
-#endif /* CONFIG_CONSOLE_ANSI */
 
 	return 0;
 }
@@ -647,14 +580,12 @@ static int lcd_getbgcolor(void)
 
 /*----------------------------------------------------------------------*/
 
-#ifdef CONFIG_ANSI_CONSOLE
 static void lcd_swap_colors(void)
 {
 	int tmp = lcd_color_bg;
 	lcd_color_bg = lcd_color_fg;
 	lcd_color_fg = tmp;
 }
-#endif
 
 /************************************************************************/
 /* ** Chipset depending Bitmap / Logo stuff...                          */
