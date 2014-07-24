@@ -13,8 +13,9 @@
 
 struct ansi_console_t {
 	void (*putc)(const char c);
+	void (*sync)(void);
+	void (*scroll)(int n);
 
-	void (*previous_line)(int n);
 	void (*new_line)(int n);
 
 	void (*clear_line)(int line, int begin, int end);

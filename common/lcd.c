@@ -235,25 +235,6 @@ static inline void console_newline(void)
 
 /*----------------------------------------------------------------------*/
 
-static inline void console_prevline_n(int n)
-{
-	console_col = 0;
-
-	console_row -= n;
-	/* Check if we need to scroll the terminal */
-	if (console_row < 0)
-		console_scrollup_n(1 - console_row);
-	else
-		lcd_sync();
-}
-
-static inline void console_prevline(void)
-{
-	console_prevline_n(1);
-}
-
-/*----------------------------------------------------------------------*/
-
 static inline void console_clear_line(int line, int begin, int end)
 {
 	short i = 0;
@@ -589,7 +570,8 @@ static int lcd_init(void *lcdbase)
 	ansi_console.cursor_set = NULL;
 	ansi_console.cursor_enable = NULL;
 #endif
-	ansi_console.previous_line = console_prevline_n;
+	ansi_console.sync = lcd_sync;
+	ansi_console.scroll = console_scrollup_n;
 	ansi_console.new_line = console_newline_n;
 	ansi_console.clear_line = console_clear_line;
 	ansi_console.clear = lcd_clear;

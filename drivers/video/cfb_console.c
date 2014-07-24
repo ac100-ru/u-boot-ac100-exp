@@ -814,13 +814,6 @@ static void console_cursor_fix(void)
 		console_col = CONSOLE_COLS - 1;
 }
 
-static void console_previousline(int n)
-{
-	/* FIXME: also scroll terminal ? */
-	console_row -= n;
-	console_cursor_fix();
-}
-
 static void console_swap_colors(void)
 {
 	eorx = fgx;
@@ -2004,7 +1997,6 @@ static int video_init(void)
 	ansi_console.cursor_set = video_set_cursor;
 	ansi_console.cursor_enable = console_cursor;
 #endif
-	ansi_console.previous_line = console_previousline;
 	ansi_console.new_line = console_newline;
 
 	ansi_console.set_position = console_cursor_set_position;

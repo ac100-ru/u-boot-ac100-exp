@@ -51,6 +51,19 @@ static inline void console_cursor_right(struct ansi_console_t* console, int n)
 		*console->console_col = console->cols - 1;
 }
 
+static inline void console_previous_line(struct ansi_console_t* console, int n)
+{
+	*console->console_col = 0;
+	*console->console_row -= n;
+
+	/* Check if we need to scroll the terminal */
+	if (*console->console_row < 0) {
+		if (console->scroll)
+			console->scroll(1 - *console->console_row);
+	}
+	else if (console->sync)
+		console->sync();
+}
 
 void ansi_putc(struct ansi_console_t* console, const char c)
 {
@@ -200,7 +213,7 @@ void ansi_putc(struct ansi_console_t* console, const char c)
 				break;
 			case 'E':
 				/* move cursor num1 rows up at begin of row */
-				console->previous_line(num1);
+				console_previous_line(console, num1);
 				break;
 			case 'F':
 				/* move cursor num1 rows down at begin of row */
