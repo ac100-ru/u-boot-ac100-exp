@@ -1,67 +1,69 @@
 #include <ansi_console.h>
 
+#define COL (*console->console_col)
+#define ROW (*console->console_row)
 
 #ifdef CONFIG_CONSOLE_ANSI_EXTENSION_ENABLED
 static void console_cursor_fix(struct ansi_console_t* console)
 {
-	if (*console->console_row < 0)
-		*console->console_row = 0;
-	if (*console->console_row >= console->rows)
-		*console->console_row = console->rows - 1;
-	if (*console->console_col < 0)
-		*console->console_col = 0;
-	if (*console->console_col >= console->cols)
-		*console->console_col = console->cols - 1;
+	if (ROW < 0)
+		ROW = 0;
+	if (ROW >= console->rows)
+		ROW = console->rows - 1;
+	if (COL < 0)
+		COL = 0;
+	if (COL >= console->cols)
+		COL = console->cols - 1;
 }
 
 static void console_cursor_set_position(struct ansi_console_t* console,
 		int col, int row)
 {
-	if (*console->console_row != -1)
-		*console->console_row = row;
-	if (*console->console_col != -1)
-		*console->console_col = col;
+	if (ROW != -1)
+		ROW = row;
+	if (COL != -1)
+		COL = col;
 	console_cursor_fix(console);
 }
 #endif /* CONFIG_CONSOLE_ANSI_EXTENSION_ENABLED */
 
 static inline void console_cursor_up(struct ansi_console_t* console, int n)
 {
-	*console->console_row -= n;
+	ROW -= n;
 	if (console->console_row < 0)
 		console->console_row = 0;
 }
 
 static inline void console_cursor_down(struct ansi_console_t* console, int n)
 {
-	*console->console_row += n;
-	if (*console->console_row >= console->rows)
-		*console->console_row = console->rows - 1;
+	ROW += n;
+	if (ROW >= console->rows)
+		ROW = console->rows - 1;
 }
 
 static inline void console_cursor_left(struct ansi_console_t* console, int n)
 {
-	*console->console_col -= n;
-	if (*console->console_col < 0)
-		*console->console_col = 0;
+	COL -= n;
+	if (COL < 0)
+		COL = 0;
 }
 
 static inline void console_cursor_right(struct ansi_console_t* console, int n)
 {
-	*console->console_col += n;
-	if (*console->console_col >= console->cols)
-		*console->console_col = console->cols - 1;
+	COL += n;
+	if (COL >= console->cols)
+		COL = console->cols - 1;
 }
 
 static inline void console_previous_line(struct ansi_console_t* console, int n)
 {
-	*console->console_col = 0;
-	*console->console_row -= n;
+	COL = 0;
+	ROW -= n;
 
 	/* Check if we need to scroll the terminal */
-	if (*console->console_row < 0) {
+	if (ROW < 0) {
 		if (console->scroll)
-			console->scroll(1 - *console->console_row);
+			console->scroll(1 - ROW);
 	}
 	else if (console->sync)
 		console->sync();
@@ -69,14 +71,14 @@ static inline void console_previous_line(struct ansi_console_t* console, int n)
 
 static void console_new_line(struct ansi_console_t* console, int n)
 {
-	*console->console_col = 0;
-	*console->console_row += n;
+	COL = 0;
+	ROW += n;
 
 	/* Check if we need to scroll the terminal */
-	if (*console->console_row >= console->rows) {
+	if (ROW >= console->rows) {
 		if (console->scroll)
-			console->scroll(console->rows - *console->console_row + 1);
-		*console->console_row = console->rows - 1;
+			console->scroll(console->rows - ROW + 1);
+		ROW = console->rows - 1;
 	}
 	else if (console->sync)
 		console->sync();
@@ -84,19 +86,19 @@ static void console_new_line(struct ansi_console_t* console, int n)
 
 static void console_caret_return(struct ansi_console_t* console)
 {
-	*console->console_col = 0;
+	COL = 0;
 }
 
 static inline void console_back(struct ansi_console_t* console)
 {
-	if (--(*console->console_col) < 0) {
-		*console->console_col = console->cols-1 ;
-		if (--(*console->console_row) < 0)
-			*console->console_row = 0;
+	if (--COL < 0) {
+		COL = console->cols-1 ;
+		if (--ROW < 0)
+			ROW = 0;
 	}
 
-	console->putc_cr(*console->console_col,
-		*console->console_row, ' ');
+	console->putc_cr(COL,
+		ROW, ' ');
 }
 
 
@@ -112,10 +114,10 @@ static void console_putc(struct ansi_console_t* console, const char c)
 			break;
 
 		case '\t':		/* tab 8 */
-			*console->console_col |= 0x0008;
-			*console->console_col &= ~0x0007;
+			COL |= 0x0008;
+			COL &= ~0x0007;
 
-			if (*console->console_col >= console->cols)
+			if (COL >= console->cols)
 				console_new_line(console, 1);
 			break;
 
@@ -127,11 +129,11 @@ static void console_putc(struct ansi_console_t* console, const char c)
 			break;	/* ignored */
 
 		default:		/* draw the char */
-			console->putc_cr(*console->console_col, *console->console_row, c);
-			(*console->console_col)++;
+			console->putc_cr(COL, ROW, c);
+			COL++;
 
 			/* check for new line */
-			if (*console->console_col >= console->cols)
+			if (COL >= console->cols)
 				console_new_line(console, 1);
 	}
 }
@@ -308,15 +310,11 @@ void ansi_putc(struct ansi_console_t* console, const char c)
 			case 'K':
 				/* clear line */
 				if (num1 == 0)
-					console->clear_line(*console->console_row,
-							*console->console_col,
-							-1);
+					console->clear_line(ROW, COL, -1);
 				else if (num1 == 1)
-					console->clear_line(*console->console_row,
-							0, *console->console_col);
+					console->clear_line(ROW, 0, COL);
 				else
-					console->clear_line(*console->console_row,
-							0, -1);
+					console->clear_line(ROW, 0, -1);
 				break;
 			case 'h':
 				console->ansi_cursor_hidden = 0;
