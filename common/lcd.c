@@ -255,36 +255,6 @@ static inline void console_prevline(void)
 
 /*----------------------------------------------------------------------*/
 
-static inline void console_cursor_up(int n)
-{
-	console_row -= n;
-	if (console_row < 0)
-		console_row = 0;
-}
-
-static inline void console_cursor_down(int n)
-{
-	console_row += n;
-	if (console_row >= CONSOLE_ROWS)
-		console_row = CONSOLE_ROWS-1;
-}
-
-static inline void console_cursor_left(int n)
-{
-	console_col -= n;
-	if (console_col < 0)
-		console_col = 0;
-}
-
-static inline void console_cursor_right(int n)
-{
-	console_col += n;
-	if (console_col >= CONSOLE_COLS)
-		console_col = CONSOLE_COLS-1;
-}
-
-/*----------------------------------------------------------------------*/
-
 static inline void console_clear_line(int line, int begin, int end)
 {
 	short i = 0;
@@ -613,15 +583,13 @@ static int lcd_init(void *lcdbase)
 #ifdef CONFIG_ANSI_CONSOLE
 	memset(&ansi_console, 0, sizeof(ansi_console));
 	ansi_console.putc = lcd_putc;
+	ansi_console.cols = CONSOLE_COLS;
+	ansi_console.rows = CONSOLE_ROWS;
 #if defined(CONFIG_CONSOLE_CURSOR) || defined(CONFIG_VIDEO_SW_CURSOR)
 #warning Cursor is not implemented for LCD ANSI console
 	ansi_console.cursor_set = NULL;
 	ansi_console.cursor_enable = NULL;
 #endif
-	ansi_console.cursor_up = console_cursor_up;
-	ansi_console.cursor_down = console_cursor_down;
-	ansi_console.cursor_left = console_cursor_left;
-	ansi_console.cursor_right = console_cursor_right;
 	ansi_console.previous_line = console_prevline_n;
 	ansi_console.new_line = console_newline_n;
 	ansi_console.set_position = lcd_position_cursor_n;

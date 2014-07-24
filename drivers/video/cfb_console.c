@@ -814,30 +814,6 @@ static void console_cursor_fix(void)
 		console_col = CONSOLE_COLS - 1;
 }
 
-static void console_cursor_up(int n)
-{
-	console_row -= n;
-	console_cursor_fix();
-}
-
-static void console_cursor_down(int n)
-{
-	console_row += n;
-	console_cursor_fix();
-}
-
-static void console_cursor_left(int n)
-{
-	console_col -= n;
-	console_cursor_fix();
-}
-
-static void console_cursor_right(int n)
-{
-	console_col += n;
-	console_cursor_fix();
-}
-
 static void console_cursor_set_position(int row, int col)
 {
 	if (console_row != -1)
@@ -2030,16 +2006,13 @@ static int video_init(void)
 
 	memset(&ansi_console, 0, sizeof(ansi_console));
 	ansi_console.putc = parse_putc;
+	ansi_console.cols = CONSOLE_COLS;
+	ansi_console.rows = CONSOLE_ROWS;
 
 #if defined(CONFIG_CONSOLE_CURSOR) || defined(CONFIG_VIDEO_SW_CURSOR)
 	ansi_console.cursor_set = video_set_cursor;
 	ansi_console.cursor_enable = console_cursor;
 #endif
-	ansi_console.cursor_up = console_cursor_up;
-	ansi_console.cursor_up = console_cursor_up;
-	ansi_console.cursor_down = console_cursor_down;
-	ansi_console.cursor_left = console_cursor_left;
-	ansi_console.cursor_right = console_cursor_right;
 	ansi_console.previous_line = console_previousline;
 	ansi_console.new_line = console_newline;
 

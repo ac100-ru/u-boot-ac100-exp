@@ -14,10 +14,6 @@
 struct ansi_console_t {
 	void (*putc)(const char c);
 
-	void (*cursor_up)(int n);
-	void (*cursor_down)(int n);
-	void (*cursor_left)(int n);
-	void (*cursor_right)(int n);
 	void (*previous_line)(int n);
 	void (*new_line)(int n);
 
@@ -32,6 +28,8 @@ struct ansi_console_t {
 	void (*cursor_set)(void);
 	void (*cursor_enable)(int state);
 
+	int cols;
+	int rows;
 	int* console_col;
 	int* console_row;
 

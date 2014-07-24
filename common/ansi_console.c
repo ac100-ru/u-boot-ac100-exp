@@ -1,6 +1,35 @@
 #include <ansi_console.h>
 
 
+static inline void console_cursor_up(struct ansi_console_t* console, int n)
+{
+	*console->console_row -= n;
+	if (console->console_row < 0)
+		console->console_row = 0;
+}
+
+static inline void console_cursor_down(struct ansi_console_t* console, int n)
+{
+	*console->console_row += n;
+	if (*console->console_row >= console->rows)
+		*console->console_row = console->rows - 1;
+}
+
+static inline void console_cursor_left(struct ansi_console_t* console, int n)
+{
+	*console->console_col -= n;
+	if (*console->console_col < 0)
+		*console->console_col = 0;
+}
+
+static inline void console_cursor_right(struct ansi_console_t* console, int n)
+{
+	*console->console_col += n;
+	if (*console->console_col >= console->cols)
+		*console->console_col = console->cols - 1;
+}
+
+
 void ansi_putc(struct ansi_console_t* console, const char c)
 {
 	int i;
@@ -133,19 +162,19 @@ void ansi_putc(struct ansi_console_t* console, const char c)
 			switch (cchar) {
 			case 'A':
 				/* move cursor num1 rows up */
-				console->cursor_up(num1);
+				console_cursor_up(console, num1);
 				break;
 			case 'B':
 				/* move cursor num1 rows down */
-				console->cursor_down(num1);
+				console_cursor_down(console, num1);
 				break;
 			case 'C':
 				/* move cursor num1 columns forward */
-				console->cursor_right(num1);
+				console_cursor_right(console, num1);
 				break;
 			case 'D':
 				/* move cursor num1 columns back */
-				console->cursor_left(num1);
+				console_cursor_left(console, num1);
 				break;
 			case 'E':
 				/* move cursor num1 rows up at begin of row */
