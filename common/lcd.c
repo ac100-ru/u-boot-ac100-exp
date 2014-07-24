@@ -109,7 +109,6 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-void lcd_position_cursor_n(int col, int row);
 static void lcd_drawchars(ushort x, ushort y, uchar *str, int count);
 static inline void lcd_puts_xy(ushort x, ushort y, uchar *s);
 static inline void lcd_putc_xy(ushort x, ushort y, uchar  c);
@@ -592,7 +591,6 @@ static int lcd_init(void *lcdbase)
 #endif
 	ansi_console.previous_line = console_prevline_n;
 	ansi_console.new_line = console_newline_n;
-	ansi_console.set_position = lcd_position_cursor_n;
 	ansi_console.clear_line = console_clear_line;
 	ansi_console.clear = lcd_clear;
 	ansi_console.swap_colors = lcd_swap_colors;
@@ -1221,16 +1219,10 @@ static int on_splashimage(const char *name, const char *value, enum env_op op,
 U_BOOT_ENV_CALLBACK(splashimage, on_splashimage);
 #endif
 
-/* TODO Remove semi-duplicate */
 void lcd_position_cursor(unsigned col, unsigned row)
 {
 	console_col = min(col, CONSOLE_COLS - 1);
 	console_row = min(row, CONSOLE_ROWS - 1);
-}
-
-void lcd_position_cursor_n(int row, int col)
-{
-	lcd_position_cursor((unsigned)col, (unsigned)row);
 }
 
 int lcd_get_pixel_width(void)

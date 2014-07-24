@@ -1,6 +1,28 @@
 #include <ansi_console.h>
 
 
+static void console_cursor_fix(struct ansi_console_t* console)
+{
+	if (*console->console_row < 0)
+		*console->console_row = 0;
+	if (*console->console_row >= console->rows)
+		*console->console_row = console->rows - 1;
+	if (*console->console_col < 0)
+		*console->console_col = 0;
+	if (*console->console_col >= console->cols)
+		*console->console_col = console->cols - 1;
+}
+
+static void console_cursor_set_position(struct ansi_console_t* console,
+		int col, int row)
+{
+	if (*console->console_row != -1)
+		*console->console_row = row;
+	if (*console->console_col != -1)
+		*console->console_col = col;
+	console_cursor_fix(console);
+}
+
 static inline void console_cursor_up(struct ansi_console_t* console, int n)
 {
 	*console->console_row -= n;
@@ -186,16 +208,16 @@ void ansi_putc(struct ansi_console_t* console, const char c)
 				break;
 			case 'G':
 				/* move cursor to column num1 */
-				console->set_position(-1, num1-1);
+				console_cursor_set_position(console, -1, num1-1);
 				break;
 			case 'H':
 				/* move cursor to row num1, column num2 */
-				console->set_position(num1-1, num2-1);
+				console_cursor_set_position(console, num1-1, num2-1);
 				break;
 			case 'J':
 				/* clear console and move cursor to 0, 0 */
 				console->clear();
-				console->set_position(0, 0);
+				console_cursor_set_position(console, 0, 0);
 				break;
 			case 'K':
 				/* clear line */

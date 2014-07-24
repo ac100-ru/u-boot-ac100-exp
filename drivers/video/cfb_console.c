@@ -814,15 +814,6 @@ static void console_cursor_fix(void)
 		console_col = CONSOLE_COLS - 1;
 }
 
-static void console_cursor_set_position(int row, int col)
-{
-	if (console_row != -1)
-		console_row = row;
-	if (console_col != -1)
-		console_col = col;
-	console_cursor_fix();
-}
-
 static void console_previousline(int n)
 {
 	/* FIXME: also scroll terminal ? */

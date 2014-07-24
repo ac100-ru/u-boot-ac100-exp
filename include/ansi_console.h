@@ -17,8 +17,6 @@ struct ansi_console_t {
 	void (*previous_line)(int n);
 	void (*new_line)(int n);
 
-	void (*set_position)(int row, int col);
-
 	void (*clear_line)(int line, int begin, int end);
 
 	void (*clear)(void);
