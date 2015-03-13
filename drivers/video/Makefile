@@ -8,7 +8,7 @@
 obj-$(CONFIG_ATI_RADEON_FB) += ati_radeon_fb.o videomodes.o
 obj-$(CONFIG_ATMEL_HLCD) += atmel_hlcdfb.o
 obj-$(CONFIG_ATMEL_LCD) += atmel_lcdfb.o
-obj-$(CONFIG_CFB_CONSOLE) += cfb_console.o
+obj-$(CONFIG_CFB_CONSOLE) += cfb_console.o ansi_console.o
 obj-$(CONFIG_EXYNOS_DP) += exynos_dp.o exynos_dp_lowlevel.o
 obj-$(CONFIG_EXYNOS_FB) += exynos_fb.o exynos_fimd.o
 obj-$(CONFIG_EXYNOS_MIPI_DSIM) += exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
