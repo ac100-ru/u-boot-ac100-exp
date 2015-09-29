@@ -44,6 +44,13 @@ static const struct usb_eth_prob_dev prob_dev[] = {
 		.get_info = smsc95xx_eth_get_info,
 	},
 #endif
+#ifdef CONFIG_USB_ETHER_DM9601
+	{
+		.before_probe = dm9601_eth_before_probe,
+		.probe = dm9601_eth_probe,
+		.get_info = dm9601_eth_get_info,
+	},
+#endif
 	{ },		/* END */
 };
 
