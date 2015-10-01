@@ -83,6 +83,13 @@ static const struct dm_dongle products[] = {
 #define DM_CHIP_ID	0x2c
 #define DM_MODE_CTRL	0x91	/* only on dm9620 */
 
+/* DM_RX_CTRL */
+#define DM_RX_DIS_LONG	(1 << 5)
+#define DM_RX_DIS_CRC	(1 << 4)
+#define DM_RX_ALL	(1 << 3)
+#define DM_RX_PRMSC	(1 << 1)
+#define DM_RX_RXEN	(1 << 0)
+
 /* chip id values */
 #define ID_DM9601	0
 #define ID_DM9620	1
@@ -178,7 +185,7 @@ static int dm_read_shared_word(struct ueth_data *dev, int phy, u8 reg, __le16 *v
 	}
 
 	if (i == DM_TIMEOUT) {
-		debug("%s read timed out!\n", phy ? "phy" : "eeprom");
+		printf("%s read timed out!\n", phy ? "phy" : "eeprom");
 		ret = -EIO;
 		goto out;
 	}
@@ -222,7 +229,7 @@ static int dm_write_shared_word(struct ueth_data *dev, int phy, u8 reg, __le16 v
 	}
 
 	if (i == DM_TIMEOUT) {
-		debug("%s write timed out!\n", phy ? "phy" : "eeprom");
+		printf("%s write timed out!\n", phy ? "phy" : "eeprom");
 		ret = -EIO;
 		goto out;
 	}
@@ -274,7 +281,7 @@ static int dm9601_mdio_read(struct ueth_data *dev, int phy_id, int loc)
 	__le16 res;
 
 	if (phy_id) {
-		debug("Only internal phy supported\n");
+		printf("Only internal phy supported\n");
 		return 0;
 	}
 
@@ -293,7 +300,7 @@ static void dm9601_mdio_write(struct ueth_data *dev, int phy_id, int loc,
 	__le16 res = cpu_to_le16(val);
 
 	if (phy_id) {
-		debug("Only internal phy supported\n");
+		printf("Only internal phy supported\n");
 		return;
 	}
 
@@ -340,8 +347,7 @@ static int dm9601_set_mac_address(struct eth_device *eth)
 	struct ueth_data *dev = (struct ueth_data *)eth->priv;
 
 	if (!is_valid_ether_addr(eth->enetaddr)) {
-		debug("not setting invalid mac address %pM\n",
-								eth->enetaddr);
+		printf("not setting invalid mac address %pM\n", eth->enetaddr);
 		return -EINVAL;
 	}
 
@@ -357,7 +363,7 @@ static int dm9601_read_mac_address(struct eth_device *eth)
 
 	/* read MAC */
 	if (dm_read(dev, DM_PHY_ADDR, ETH_ALEN, eth->enetaddr) < 0) {
-		debug("Error reading MAC address\n");
+		printf("dm9601: Error reading MAC address\n");
 		return -ENODEV;
 	}
 
@@ -371,17 +377,17 @@ static void dm9601_set_multicast(struct eth_device *eth)
 	/* We use the 20 byte dev->data for our 8 byte filter buffer
 	 * to avoid allocating memory that is tricky to free later */
 	u8 hashes[DM_MCAST_SIZE];
-	u8 rx_ctl = 0x31;
+	u8 rx_ctl = (DM_RX_DIS_LONG | DM_RX_DIS_CRC | DM_RX_RXEN);
 
 	memset(hashes, 0x00, DM_MCAST_SIZE);
 	hashes[DM_MCAST_SIZE - 1] |= 0x80;	/* broadcast address */
 
 #if 0
 	if (net->flags & IFF_PROMISC) {
-		rx_ctl |= 0x02;
+		rx_ctl |= DM_RX_PRMSC;
 	} else if (net->flags & IFF_ALLMULTI ||
 		   netdev_mc_count(net) > DM_MAX_MCAST) {
-		rx_ctl |= 0x08;
+		rx_ctl |= DM_RX_ALL;
 	} else if (!netdev_mc_empty(net)) {
 		struct netdev_hw_addr *ha;
 
@@ -422,39 +428,37 @@ static int mii_nway_restart(struct ueth_data *dev)
 
 static int dm9601_init(struct eth_device *eth, bd_t *bd)
 {
-	u8 id = 0;
-	struct ueth_data *dev = (struct ueth_data *)eth->priv;
+	struct ueth_data	*dev = (struct ueth_data *)eth->priv;
+	int timeout = 0;
+	int link_detected;
 
-	if (dm_read_reg(dev, DM_CHIP_ID, &id) < 0) {
-		debug("Error reading chip ID\n");
-		return 0;
-	}
+	debug("** %s()\n", __func__);
 
-	/* put dm9620 devices in dm9601 mode */
-	if (id == ID_DM9620) {
-		u8 mode;
-
-		if (dm_read_reg(dev, DM_MODE_CTRL, &mode) < 0) {
-			debug("Error reading MODE_CTRL\n");
-			return 0;
+#define TIMEOUT_RESOLUTION 50	/* ms */
+	do {
+		link_detected = dm9601_mdio_read(dev, dev->phy_id, MII_BMSR) &
+			BMSR_LSTATUS;
+		if (!link_detected) {
+			if (timeout == 0)
+				printf("Waiting for Ethernet connection... ");
+			udelay(TIMEOUT_RESOLUTION * 1000);
+			timeout += TIMEOUT_RESOLUTION;
 		}
-		dm_write_reg(dev, DM_MODE_CTRL, mode & 0x7f);
+	} while (!link_detected && timeout < PHY_CONNECT_TIMEOUT);
+	if (link_detected) {
+		if (timeout != 0)
+			printf("done.\n");
+	} else {
+		printf("unable to connect.\n");
+		goto out_err;
 	}
+#undef TIMEOUT_RESOLUTION
 
-	/* power up phy */
-	dm_write_reg(dev, DM_GPR_CTRL, 1);
-	dm_write_reg(dev, DM_GPR_DATA, 0);
+	return 0;
 
-	/* receive broadcast packets */
-	dm9601_set_multicast(eth);
-
-	dm9601_mdio_write(dev, dev->phy_id, MII_BMCR, BMCR_RESET);
-	dm9601_mdio_write(dev, dev->phy_id, MII_ADVERTISE,
-			  ADVERTISE_ALL | ADVERTISE_CSMA | ADVERTISE_PAUSE_CAP);
-
-	mii_nway_restart(dev);
-
-	return 1;
+out_err:
+	printf("dm9601: Error: unable to init device.\n");
+	return -1;
 }
 
 
@@ -679,7 +683,7 @@ int dm9601_eth_probe(struct usb_device *dev, unsigned int ifnum,
 	/* Do some basic sanity checks, and bail if we find a problem */
 	if (usb_set_interface(dev, iface_desc->bInterfaceNumber, 0) ||
 	    !ss->ep_in || !ss->ep_out || !ss->ep_int) {
-		debug("Problems with device\n");
+		printf("Problems with device\n");
 		return 0;
 	}
 
@@ -691,9 +695,10 @@ int dm9601_eth_get_info(struct usb_device *usb_dev, struct ueth_data *ss,
 				struct eth_device *eth)
 {
 	struct ueth_data *dev = (struct ueth_data *)eth->priv;
+	u8 id;
 
 	if (!eth) {
-		debug("%s: missing parameter.\n", __func__);
+		printf("%s: missing parameter.\n", __func__);
 		return 0;
 	}
 
@@ -710,8 +715,6 @@ int dm9601_eth_get_info(struct usb_device *usb_dev, struct ueth_data *ss,
 	eth->write_hwaddr = dm9601_set_mac_address;
 	eth->priv = ss;
 
-	/* Get the MAC address */
-
 	/* reset */
 	dm_write_reg(dev, DM_NET_CTRL, 1);
 	udelay(20);
@@ -724,14 +727,39 @@ int dm9601_eth_get_info(struct usb_device *usb_dev, struct ueth_data *ss,
 	/*
 	 * Overwrite the auto-generated address only with good ones.
 	 */
-	/*if (is_valid_ether_addr(mac))
-		memcpy(dev->net->dev_addr, mac, ETH_ALEN);
-	else {
-		printk(KERN_WARNING
-			"dm9601: No valid MAC address in EEPROM, using %pM\n",
-			dev->net->dev_addr);
-		__dm9601_set_mac_address(dev);
-	}*/
+	if (!is_valid_ether_addr(eth->enetaddr)) {
+		printf("dm9601: No valid MAC address in EEPROM, using %pM\n",
+			eth->enetaddr);
+		/*__dm9601_set_mac_address(dev);*/
+	}
+
+	if (dm_read_reg(dev, DM_CHIP_ID, &id) < 0) {
+		printf("dm9601: Error reading chip ID\n");
+		return 0;
+	}
+
+	/* put dm9620 devices in dm9601 mode */
+	if (id == ID_DM9620) {
+		u8 mode;
+
+		if (dm_read_reg(dev, DM_MODE_CTRL, &mode) < 0) {
+			printf("dm9601: Error reading MODE_CTRL\n");
+			return 0;
+		}
+		dm_write_reg(dev, DM_MODE_CTRL, mode & 0x7f);
+	}
+
+	/* power up phy */
+	dm_write_reg(dev, DM_GPR_CTRL, 1);
+	dm_write_reg(dev, DM_GPR_DATA, 0);
+
+	/* receive broadcast packets */
+	dm9601_set_multicast(eth);
+
+	dm9601_mdio_write(dev, dev->phy_id, MII_BMCR, BMCR_RESET);
+	dm9601_mdio_write(dev, dev->phy_id, MII_ADVERTISE,
+			  ADVERTISE_ALL | ADVERTISE_CSMA | ADVERTISE_PAUSE_CAP);
+	mii_nway_restart(dev);
 
 	return 1;
 }
