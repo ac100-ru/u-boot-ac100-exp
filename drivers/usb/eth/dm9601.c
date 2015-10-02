@@ -694,7 +694,6 @@ int dm9601_eth_probe(struct usb_device *dev, unsigned int ifnum,
 int dm9601_eth_get_info(struct usb_device *usb_dev, struct ueth_data *ss,
 				struct eth_device *eth)
 {
-	struct ueth_data *dev = (struct ueth_data *)eth->priv;
 	u8 id;
 
 	if (!eth) {
@@ -716,7 +715,7 @@ int dm9601_eth_get_info(struct usb_device *usb_dev, struct ueth_data *ss,
 	eth->priv = ss;
 
 	/* reset */
-	dm_write_reg(dev, DM_NET_CTRL, 1);
+	dm_write_reg(ss, DM_NET_CTRL, 1);
 	udelay(20);
 
 	/* read MAC */
@@ -730,10 +729,10 @@ int dm9601_eth_get_info(struct usb_device *usb_dev, struct ueth_data *ss,
 	if (!is_valid_ether_addr(eth->enetaddr)) {
 		printf("dm9601: No valid MAC address in EEPROM, using %pM\n",
 			eth->enetaddr);
-		/*__dm9601_set_mac_address(dev);*/
+		/*__dm9601_set_mac_address(ss);*/
 	}
 
-	if (dm_read_reg(dev, DM_CHIP_ID, &id) < 0) {
+	if (dm_read_reg(ss, DM_CHIP_ID, &id) < 0) {
 		printf("dm9601: Error reading chip ID\n");
 		return 0;
 	}
@@ -742,24 +741,24 @@ int dm9601_eth_get_info(struct usb_device *usb_dev, struct ueth_data *ss,
 	if (id == ID_DM9620) {
 		u8 mode;
 
-		if (dm_read_reg(dev, DM_MODE_CTRL, &mode) < 0) {
+		if (dm_read_reg(ss, DM_MODE_CTRL, &mode) < 0) {
 			printf("dm9601: Error reading MODE_CTRL\n");
 			return 0;
 		}
-		dm_write_reg(dev, DM_MODE_CTRL, mode & 0x7f);
+		dm_write_reg(ss, DM_MODE_CTRL, mode & 0x7f);
 	}
 
 	/* power up phy */
-	dm_write_reg(dev, DM_GPR_CTRL, 1);
-	dm_write_reg(dev, DM_GPR_DATA, 0);
+	dm_write_reg(ss, DM_GPR_CTRL, 1);
+	dm_write_reg(ss, DM_GPR_DATA, 0);
 
 	/* receive broadcast packets */
 	dm9601_set_multicast(eth);
 
-	dm9601_mdio_write(dev, dev->phy_id, MII_BMCR, BMCR_RESET);
-	dm9601_mdio_write(dev, dev->phy_id, MII_ADVERTISE,
+	dm9601_mdio_write(ss, ss->phy_id, MII_BMCR, BMCR_RESET);
+	dm9601_mdio_write(ss, ss->phy_id, MII_ADVERTISE,
 			  ADVERTISE_ALL | ADVERTISE_CSMA | ADVERTISE_PAUSE_CAP);
-	mii_nway_restart(dev);
+	mii_nway_restart(ss);
 
 	return 1;
 }
