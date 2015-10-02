@@ -116,7 +116,7 @@ static int dm_read(struct ueth_data *dev, u8 reg, u16 length, void *data)
 		dev->pusb_dev,
 		usb_sndctrlpipe(dev->pusb_dev, 0),
 		DM_READ_REGS,
-		USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 		0,
 		reg,
 		data,
@@ -128,7 +128,10 @@ static int dm_read(struct ueth_data *dev, u8 reg, u16 length, void *data)
 
 static int dm_read_reg(struct ueth_data *dev, u8 reg, u8 *value)
 {
-	return dm_read(dev, reg, 1, value);
+	ALLOC_CACHE_ALIGN_BUFFER(u8, v, 1);
+	int res = dm_read(dev, reg, 1, v);
+	*value = v[0];
+	return res;
 }
 
 static int dm_write(struct ueth_data *dev, u8 reg, u16 length, void *data)
@@ -278,19 +281,19 @@ static int dm9601_get_eeprom(struct net_device *net,
 
 static int dm9601_mdio_read(struct ueth_data *dev, int phy_id, int loc)
 {
-	__le16 res;
+	ALLOC_CACHE_ALIGN_BUFFER(__le16, v, 1);
 
 	if (phy_id) {
 		printf("Only internal phy supported\n");
 		return 0;
 	}
 
-	dm_read_shared_word(dev, 1, loc, &res);
+	dm_read_shared_word(dev, 1, loc, v);
 
 	debug("dm9601_mdio_read() phy_id=0x%02x, loc=0x%02x, returns=0x%04x\n",
-		  phy_id, loc, le16_to_cpu(res));
+		  phy_id, loc, le16_to_cpu(*v));
 
-	return le16_to_cpu(res);
+	return le16_to_cpu(*v);
 }
 
 
@@ -336,22 +339,18 @@ static int dm9601_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 #endif
 
 
-static void __dm9601_set_mac_address(struct ueth_data *dev)
-{
-	dm_write /*_async*/(dev, DM_PHY_ADDR, ETH_ALEN, dev->eth_dev.enetaddr);
-}
-
-
 static int dm9601_set_mac_address(struct eth_device *eth)
 {
 	struct ueth_data *dev = (struct ueth_data *)eth->priv;
+	ALLOC_CACHE_ALIGN_BUFFER(unsigned char, buf, ETH_ALEN);
 
 	if (!is_valid_ether_addr(eth->enetaddr)) {
 		printf("not setting invalid mac address %pM\n", eth->enetaddr);
 		return -EINVAL;
 	}
 
-	__dm9601_set_mac_address(dev);
+	memcpy(buf, eth->enetaddr, ETH_ALEN);
+	dm_write(dev, DM_PHY_ADDR, ETH_ALEN, buf);
 
 	return 0;
 }
@@ -360,12 +359,15 @@ static int dm9601_set_mac_address(struct eth_device *eth)
 static int dm9601_read_mac_address(struct eth_device *eth)
 {
 	struct ueth_data *dev = (struct ueth_data *)eth->priv;
+	ALLOC_CACHE_ALIGN_BUFFER(unsigned char, buf, ETH_ALEN);
 
 	/* read MAC */
-	if (dm_read(dev, DM_PHY_ADDR, ETH_ALEN, eth->enetaddr) < 0) {
+	if (dm_read(dev, DM_PHY_ADDR, ETH_ALEN, buf) < 0) {
 		printf("dm9601: Error reading MAC address\n");
 		return -ENODEV;
 	}
+
+	memcpy(eth->enetaddr, buf, ETH_ALEN);
 
 	return 0;
 }
