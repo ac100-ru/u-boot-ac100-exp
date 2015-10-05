@@ -8,7 +8,7 @@
  * kind, whether express or implied.
  */
 
-//#define DEBUG
+#define DEBUG
 
 #if 0
 #include <linux/module.h>
@@ -114,7 +114,7 @@ static int dm_read(struct ueth_data *dev, u8 reg, u16 length, void *data)
 	int len;
 	len = usb_control_msg(
 		dev->pusb_dev,
-		usb_sndctrlpipe(dev->pusb_dev, 0),
+		usb_rcvctrlpipe(dev->pusb_dev, 0),
 		DM_READ_REGS,
 		USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 		0,
@@ -128,8 +128,10 @@ static int dm_read(struct ueth_data *dev, u8 reg, u16 length, void *data)
 
 static int dm_read_reg(struct ueth_data *dev, u8 reg, u8 *value)
 {
-	ALLOC_CACHE_ALIGN_BUFFER(u8, v, 1);
-	int res = dm_read(dev, reg, 1, v);
+	int res;
+	ALLOC_CACHE_ALIGN_BUFFER(u8, v, 2);
+
+	res = dm_read(dev, reg, 1, v);
 	*value = v[0];
 	return res;
 }
@@ -139,7 +141,7 @@ static int dm_write(struct ueth_data *dev, u8 reg, u16 length, void *data)
 	int len;
 	len = usb_control_msg(
 		dev->pusb_dev,
-		usb_rcvctrlpipe(dev->pusb_dev, 0),
+		usb_sndctrlpipe(dev->pusb_dev, 0),
 		DM_WRITE_REGS,
 		USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 		0,
@@ -152,9 +154,9 @@ static int dm_write(struct ueth_data *dev, u8 reg, u16 length, void *data)
 
 static int dm_write_reg(struct ueth_data *dev, u8 reg, u8 value)
 {
-	return usb_control_msg(
+	int res = usb_control_msg(
 		dev->pusb_dev,
-		usb_rcvctrlpipe(dev->pusb_dev, 0),
+		usb_sndctrlpipe(dev->pusb_dev, 0),
 		DM_WRITE_REG,
 		USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 		value,
@@ -162,6 +164,7 @@ static int dm_write_reg(struct ueth_data *dev, u8 reg, u8 value)
 		NULL,
 		0,
 		USB_CTRL_SET_TIMEOUT);
+	return res;
 }
 
 
@@ -208,10 +211,12 @@ static int dm_read_shared_word(struct ueth_data *dev, int phy, u8 reg, __le16 *v
 static int dm_write_shared_word(struct ueth_data *dev, int phy, u8 reg, __le16 value)
 {
 	int ret, i;
+	ALLOC_CACHE_ALIGN_BUFFER(__le16, v, 1);
+	*v = value;
 
 	/*mutex_lock(&dev->phy_mutex);*/
 
-	ret = dm_write(dev, DM_SHARED_DATA, 2, &value);
+	ret = dm_write(dev, DM_SHARED_DATA, 2, v);
 	if (ret < 0)
 		goto out;
 
@@ -290,27 +295,27 @@ static int dm9601_mdio_read(struct ueth_data *dev, int phy_id, int loc)
 
 	dm_read_shared_word(dev, 1, loc, v);
 
-	debug("dm9601_mdio_read() phy_id=0x%02x, loc=0x%02x, returns=0x%04x\n",
-		  phy_id, loc, le16_to_cpu(*v));
+	debug("dm9601_mdio_read() phy_id=0x%02x, loc=0x%02x, returns=0x%04x|0x%04x\n",
+		  phy_id, loc, *v, le16_to_cpu(*v));
 
 	return le16_to_cpu(*v);
 }
 
 
-static void dm9601_mdio_write(struct ueth_data *dev, int phy_id, int loc,
+static int dm9601_mdio_write(struct ueth_data *dev, int phy_id, int loc,
 			      int val)
 {
 	__le16 res = cpu_to_le16(val);
 
 	if (phy_id) {
 		printf("Only internal phy supported\n");
-		return;
+		return -EINVAL;
 	}
 
-	debug("dm9601_mdio_write() phy_id=0x%02x, loc=0x%02x, val=0x%04x\n",
-		   phy_id, loc, val);
+	debug("dm9601_mdio_write() phy_id=0x%02x, loc=0x%02x, val=0x%04x|0x%04x\n",
+		   phy_id, loc, res, val);
 
-	dm_write_shared_word(dev, 1, loc, res);
+	return dm_write_shared_word(dev, 1, loc, res);
 }
 
 
@@ -378,7 +383,7 @@ static void dm9601_set_multicast(struct eth_device *eth)
 	struct ueth_data *dev = (struct ueth_data *)eth->priv;
 	/* We use the 20 byte dev->data for our 8 byte filter buffer
 	 * to avoid allocating memory that is tricky to free later */
-	u8 hashes[DM_MCAST_SIZE];
+	ALLOC_CACHE_ALIGN_BUFFER(unsigned char, hashes, DM_MCAST_SIZE);
 	u8 rx_ctl = (DM_RX_DIS_LONG | DM_RX_DIS_CRC | DM_RX_RXEN);
 
 	memset(hashes, 0x00, DM_MCAST_SIZE);
@@ -417,7 +422,7 @@ static int mii_nway_restart(struct ueth_data *dev)
 
 	/* if autoneg is off, it's an error */
 	bmcr = dm9601_mdio_read(dev, dev->phy_id, MII_BMCR);
-
+	printf("%s: bmcr: 0x%x\n", __func__, bmcr);
 	if (bmcr & BMCR_ANENABLE) {
 		bmcr |= BMCR_ANRESTART;
 		dm9601_mdio_write(dev, dev->phy_id, MII_BMCR, bmcr);
@@ -428,6 +433,48 @@ static int mii_nway_restart(struct ueth_data *dev)
 }
 
 
+/*
+ * mcs7830_set_autoneg() - setup and trigger ethernet link autonegotiation
+ * @eth:	network device to run link negotiation on
+ * Return: zero upon success, negative upon error
+ *
+ * the routine advertises available media and starts autonegotiation
+ */
+static int dm_set_autoneg(struct ueth_data *dev)
+{
+	int adv, flg;
+	int rc;
+
+	debug("%s()\n", __func__);
+
+	/*
+	 * algorithm taken from the Linux driver, which took it from
+	 * "the original mcs7830 version 1.4 driver":
+	 *
+	 * enable all media, reset BMCR, enable auto neg, restart
+	 * auto neg while keeping the enable auto neg flag set
+	 */
+
+	adv = ADVERTISE_PAUSE_CAP | ADVERTISE_ALL | ADVERTISE_CSMA;
+	rc = dm9601_mdio_write(dev, dev->phy_id, MII_ADVERTISE, adv);
+
+	flg = 0;
+	if (!rc)
+		rc = dm9601_mdio_write(dev, dev->phy_id, MII_BMCR, flg);
+
+	flg |= BMCR_ANENABLE;
+	if (!rc)
+		rc = dm9601_mdio_write(dev, dev->phy_id, MII_BMCR, flg);
+
+	flg |= BMCR_ANRESTART;
+	if (!rc)
+		rc = dm9601_mdio_write(dev, dev->phy_id, MII_BMCR, flg);
+
+	debug("%s() rc: %d\n", __func__, rc);
+
+	return rc;
+}
+
 static int dm9601_init(struct eth_device *eth, bd_t *bd)
 {
 	struct ueth_data	*dev = (struct ueth_data *)eth->priv;
@@ -435,6 +482,9 @@ static int dm9601_init(struct eth_device *eth, bd_t *bd)
 	int link_detected;
 
 	debug("** %s()\n", __func__);
+
+	mii_nway_restart(dev);
+	dm_set_autoneg(dev);
 
 #define TIMEOUT_RESOLUTION 50	/* ms */
 	do {
@@ -696,7 +746,9 @@ int dm9601_eth_probe(struct usb_device *dev, unsigned int ifnum,
 int dm9601_eth_get_info(struct usb_device *usb_dev, struct ueth_data *ss,
 				struct eth_device *eth)
 {
-	u8 id;
+	u8 id = 0xff;
+
+	debug("\n%s\n", __func__);
 
 	if (!eth) {
 		printf("%s: missing parameter.\n", __func__);
@@ -757,6 +809,7 @@ int dm9601_eth_get_info(struct usb_device *usb_dev, struct ueth_data *ss,
 	/* receive broadcast packets */
 	dm9601_set_multicast(eth);
 
+	dm9601_mdio_read(ss, ss->phy_id, MII_BMSR);
 	dm9601_mdio_write(ss, ss->phy_id, MII_BMCR, BMCR_RESET);
 	dm9601_mdio_write(ss, ss->phy_id, MII_ADVERTISE,
 			  ADVERTISE_ALL | ADVERTISE_CSMA | ADVERTISE_PAUSE_CAP);
