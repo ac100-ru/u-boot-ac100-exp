@@ -112,6 +112,7 @@ static const struct dm_dongle products[] = {
 static int dm_read(struct ueth_data *dev, u8 reg, u16 length, void *data)
 {
 	int len;
+	debug("%s() reg=%d, length=%d\n", __func__, reg, length);
 	len = usb_control_msg(
 		dev->pusb_dev,
 		usb_rcvctrlpipe(dev->pusb_dev, 0),
@@ -139,6 +140,7 @@ static int dm_read_reg(struct ueth_data *dev, u8 reg, u8 *value)
 static int dm_write(struct ueth_data *dev, u8 reg, u16 length, void *data)
 {
 	int len;
+	debug("%s() reg=%d, length=%d data=%pM\n", __func__, reg, length, data);
 	len = usb_control_msg(
 		dev->pusb_dev,
 		usb_sndctrlpipe(dev->pusb_dev, 0),
@@ -154,6 +156,7 @@ static int dm_write(struct ueth_data *dev, u8 reg, u16 length, void *data)
 
 static int dm_write_reg(struct ueth_data *dev, u8 reg, u8 value)
 {
+	debug("%s() reg=%d, value=0x%x\n", __func__, reg, (int)value);
 	int res = usb_control_msg(
 		dev->pusb_dev,
 		usb_sndctrlpipe(dev->pusb_dev, 0),
@@ -378,16 +381,12 @@ static int dm9601_read_mac_address(struct eth_device *eth)
 }
 
 
-static void dm9601_set_multicast(struct eth_device *eth)
+static void dm9601_set_multicast(struct ueth_data *dev, u8 mcast[DM_MCAST_SIZE])
 {
-	struct ueth_data *dev = (struct ueth_data *)eth->priv;
-	/* We use the 20 byte dev->data for our 8 byte filter buffer
-	 * to avoid allocating memory that is tricky to free later */
 	ALLOC_CACHE_ALIGN_BUFFER(unsigned char, hashes, DM_MCAST_SIZE);
 	u8 rx_ctl = (DM_RX_DIS_LONG | DM_RX_DIS_CRC | DM_RX_RXEN);
 
-	memset(hashes, 0x00, DM_MCAST_SIZE);
-	hashes[DM_MCAST_SIZE - 1] |= 0x80;	/* broadcast address */
+	memcpy(hashes, mcast, DM_MCAST_SIZE);
 
 #if 0
 	if (net->flags & IFF_PROMISC) {
@@ -409,6 +408,21 @@ static void dm9601_set_multicast(struct eth_device *eth)
 	dm_write_reg(dev, DM_RX_CTRL, rx_ctl);
 }
 
+
+static int dm9601_link_reset(struct ueth_data *dev)
+{
+	u8 mcast0[DM_MCAST_SIZE] = { 0x0 };
+	u8 mcast1[DM_MCAST_SIZE] = { 0, 0x00, 0, 0x80, 0, 0, 0, 0 };
+	u8 mcast2[DM_MCAST_SIZE] = { 0, 0x00, 0, 0x84, 0, 0, 0, 0 };
+	u8 mcast3[DM_MCAST_SIZE] = { 0, 0x80, 0, 0x84, 0, 0, 0, 0 };
+
+	dm9601_set_multicast(dev, mcast0);
+	dm9601_set_multicast(dev, mcast1);
+	dm9601_set_multicast(dev, mcast2);
+	dm9601_set_multicast(dev, mcast3);
+
+	return 0;
+}
 
 /*
  * mii_nway_restart - restart NWay (autonegotiation) for this interface
@@ -433,6 +447,7 @@ static int mii_nway_restart(struct ueth_data *dev)
 }
 
 
+#if 0
 /*
  * mcs7830_set_autoneg() - setup and trigger ethernet link autonegotiation
  * @eth:	network device to run link negotiation on
@@ -474,6 +489,8 @@ static int dm_set_autoneg(struct ueth_data *dev)
 
 	return rc;
 }
+#endif
+
 
 static int dm9601_init(struct eth_device *eth, bd_t *bd)
 {
@@ -484,7 +501,9 @@ static int dm9601_init(struct eth_device *eth, bd_t *bd)
 	debug("** %s()\n", __func__);
 
 	mii_nway_restart(dev);
-	dm_set_autoneg(dev);
+	/*dm_set_autoneg(dev);*/
+
+	dm9601_link_reset(dev);
 
 #define TIMEOUT_RESOLUTION 50	/* ms */
 	do {
@@ -520,8 +539,7 @@ static int dm9601_send(struct eth_device *eth, void *packet, int length)
 	int err;
 	u16 packet_len;
 	int actual_len;
-	ALLOC_CACHE_ALIGN_BUFFER(unsigned char, msg,
-		PKTSIZE + sizeof(packet_len));
+	ALLOC_CACHE_ALIGN_BUFFER(unsigned char, msg, PKTSIZE + sizeof(packet_len));
 
 	debug("** %s(), len %d\n", __func__, length);
 
@@ -531,7 +549,7 @@ static int dm9601_send(struct eth_device *eth, void *packet, int length)
 	   b3..n: packet data
 	*/
 
-	packet_len = (((length) ^ 0x000000ff) << 8) + (length);
+	packet_len = length;
 	cpu_to_le16s(&packet_len);
 
 	memcpy(msg, &packet_len, sizeof(packet_len));
@@ -554,6 +572,7 @@ static int dm9601_recv(struct eth_device *eth)
 {
 	struct ueth_data *dev = (struct ueth_data *)eth->priv;
 	ALLOC_CACHE_ALIGN_BUFFER(unsigned char, recv_buf, AX_RX_URB_SIZE);
+	ALLOC_CACHE_ALIGN_BUFFER(unsigned char, pkt, PKTSIZE);
 	unsigned char *buf_ptr;
 	int err;
 	int actual_len;
@@ -579,11 +598,11 @@ static int dm9601_recv(struct eth_device *eth)
 	debug("Rx: len = %u, actual = %u, err = %d\n", AX_RX_URB_SIZE,
 		actual_len, err);
 	if (err != 0) {
-		debug("Rx: failed to receive\n");
+		printf("Rx: failed to receive\n");
 		return -1;
 	}
 	if (actual_len > AX_RX_URB_SIZE) {
-		debug("Rx: received too many bytes %d\n", actual_len);
+		printf("Rx: received too many bytes %d\n", actual_len);
 		return -1;
 	}
 
@@ -593,7 +612,7 @@ static int dm9601_recv(struct eth_device *eth)
 		 * First byte contains packet status.
 		 */
 		if (actual_len < sizeof(status)) {
-			debug("Rx: incomplete packet length (status)\n");
+			printf("Rx: incomplete packet length (status)\n");
 			return -1;
 		}
 		status = buf_ptr[0];
@@ -601,7 +620,7 @@ static int dm9601_recv(struct eth_device *eth)
 		actual_len -= sizeof(status);
 
 		if (unlikely(status & 0xbf)) {
-			debug("Rx: packet status failure: %d\n", (int)status);
+			printf("Rx: packet status failure: %d\n", (int)status);
 			/*
 			if (status & 0x01) dev->net->stats.rx_fifo_errors++;
 			if (status & 0x02) dev->net->stats.rx_crc_errors++;
@@ -617,34 +636,29 @@ static int dm9601_recv(struct eth_device *eth)
 		 * Extract the length of the data.
 		 */
 		if (actual_len < sizeof(packet_len)) {
-			debug("Rx: incomplete packet length (size)\n");
+			printf("Rx: incomplete packet length (size)\n");
 			return -1;
 		}
 		memcpy(&packet_len, buf_ptr, sizeof(packet_len));
 		le16_to_cpus(&packet_len);
+		packet_len -= 4;
 		buf_ptr += sizeof(packet_len);
 		actual_len -= sizeof(packet_len);
 
-		if (((~packet_len >> 16) & 0x7ff) != (packet_len & 0x7ff)) {
-			debug("Rx: malformed packet length: %#x (%#x:%#x)\n",
-			      packet_len, (~packet_len >> 16) & 0x7ff,
-			      packet_len & 0x7ff);
-			return -1;
-		}
-		packet_len = packet_len & 0x7ff;
 		if (packet_len > actual_len) {
-			debug("Rx: too large packet: %d\n", packet_len);
+			printf("Rx: too large packet: %d, actual: %d\n", packet_len, actual_len);
 			return -1;
 		}
 
 		/* Notify net stack */
-		NetReceive(buf_ptr, packet_len);
+		memcpy(pkt, buf_ptr, packet_len);
+		NetReceive(pkt, packet_len);
 
 		/* Adjust for next iteration. Packets are padded to 16-bits */
-		if (packet_len & 1)
-			packet_len++;
-		actual_len -= packet_len;
-		buf_ptr += packet_len;
+		/*if (packet_len & 1)
+			packet_len++;*/
+		actual_len -= (packet_len + 4);
+		buf_ptr += packet_len + 4;
 	}
 
 	return err;
@@ -747,6 +761,7 @@ int dm9601_eth_get_info(struct usb_device *usb_dev, struct ueth_data *ss,
 				struct eth_device *eth)
 {
 	u8 id = 0xff;
+	u8 mcast0[DM_MCAST_SIZE] = { 0x0 };
 
 	debug("\n%s\n", __func__);
 
@@ -791,6 +806,7 @@ int dm9601_eth_get_info(struct usb_device *usb_dev, struct ueth_data *ss,
 		return 0;
 	}
 
+	debug("Chip ID = %d\n", id);
 	/* put dm9620 devices in dm9601 mode */
 	if (id == ID_DM9620) {
 		u8 mode;
@@ -807,7 +823,7 @@ int dm9601_eth_get_info(struct usb_device *usb_dev, struct ueth_data *ss,
 	dm_write_reg(ss, DM_GPR_DATA, 0);
 
 	/* receive broadcast packets */
-	dm9601_set_multicast(eth);
+	dm9601_set_multicast(ss, mcast0);
 
 	dm9601_mdio_read(ss, ss->phy_id, MII_BMSR);
 	dm9601_mdio_write(ss, ss->phy_id, MII_BMCR, BMCR_RESET);
