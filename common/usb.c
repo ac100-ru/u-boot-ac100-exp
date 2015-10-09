@@ -40,7 +40,7 @@
 #include <asm/4xx_pci.h>
 #endif
 
-#define USB_BUFSIZ	512
+#define USB_BUFSIZ	1024
 
 static struct usb_device usb_dev[USB_MAX_DEVICE];
 static int dev_index;
