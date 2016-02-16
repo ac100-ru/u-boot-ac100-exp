@@ -28,6 +28,9 @@
 #ifdef CONFIG_TEGRA_CLOCK_SCALING
 #include <asm/arch/emc.h>
 #endif
+#ifdef CONFIG_TEGRA_NVEC
+#include <asm/arch-tegra/tegra_nvec.h>
+#endif
 #include "emc.h"
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -219,6 +222,11 @@ int board_late_init(void)
 	}
 #endif
 	start_cpu_fan();
+
+#ifdef CONFIG_TEGRA_NVEC
+	if (board_nvec_init())
+		debug("NVEC controller init failed\n");
+#endif
 
 	return 0;
 }
