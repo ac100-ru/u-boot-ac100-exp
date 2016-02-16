@@ -23,19 +23,22 @@
  */
 
 #include <common.h>
+#include <dm.h>
 #include <input.h>
+#include <keyboard.h>
+#include <stdio_dev.h>
 #include <asm/arch-tegra/tegra_nvec_events.h>
 #include <asm/arch-tegra/tegra_nvec_keyboard.h>
+#include <linux/input.h>
 
 enum {
 	KBC_MAX_KPENT = 8,
 };
 
-/* keyboard config/state */
-static struct keyb {
-	struct input_config input;	/* The input layer */
-} config;
-
+enum {
+	KBC_REPEAT_RATE_MS	= 30,
+	KBC_REPEAT_DELAY_MS	= 240,
+};
 
 /**
  * Check the tegra nvec keyboard, and send any keys that are pressed.
@@ -70,62 +73,64 @@ int tegra_nvec_kbc_check(struct input_config *input)
 	return res;
 }
 
-/**
- * Test if keys are available to be read
- *
- * @return 0 if no keys available, 1 if keys are available
- */
-static int kbd_tstc(void)
+
+static int tegra_nvec_kbd_start(struct udevice *dev)
 {
-	/* Just get input to do this for us */
-	return input_tstc(&config.input);
-}
+	(void)dev;
 
-/**
- * Read a key
- *
- * TODO: U-Boot wants 0 for no key, but Ctrl-@ is a valid key...
- *
- * @return ASCII key code, or 0 if no key, or -1 if error
- */
-static int kbd_getc(void)
-{
-	/* Just get input to do this for us */
-	return input_getc(&config.input);
-}
+	debug("%s: Tegra nvec keyboard ready\n", __func__);
 
-
-int drv_keyboard_init(void)
-{
-	struct stdio_dev dev;
-	char *stdinname = getenv("stdin");
-	int error;
-
-	if (input_init(&config.input, 0)) {
-		printf("nvec kbc: cannot set up input\n");
-		return -1;
-	}
-	config.input.read_keys = tegra_nvec_kbc_check;
-
-	memset(&dev, '\0', sizeof(dev));
-	strcpy(dev.name, "tegra-nvec-kbc");
-	dev.flags = DEV_FLAGS_INPUT | DEV_FLAGS_SYSTEM;
-	dev.getc = kbd_getc;
-	dev.tstc = kbd_tstc;
-
-	/* Register the device. init_tegra_keyboard() will be called soon */
-	error = input_stdio_register(&dev);
-	if (error) {
-		printf("nvec kbc: failed to register stdio device, %d\n",
-		       error);
-		return error;
-	}
-#ifdef CONFIG_CONSOLE_MUX
-	error = iomux_doenv(stdin, stdinname);
-	if (error) {
-		printf("nvec kbc: iomux_doenv failed, %d\n", error);
-		return error;
-	}
-#endif
 	return 0;
 }
+
+/**
+ * Set up the tegra keyboard. This is called by the stdio device handler
+ *
+ * We want to do this init when the keyboard is actually used rather than
+ * at start-up, since keyboard input may not currently be selected.
+ *
+ * Once the keyboard starts there will be a period during which we must
+ * wait for the keyboard to init. We do this only when a key is first
+ * read - see kbd_wait_for_fifo_init().
+ *
+ * @return 0 if ok, -ve on error
+ */
+static int tegra_nvec_kbd_probe(struct udevice *dev)
+{
+	(void)dev;
+	struct keyboard_priv *uc_priv = dev_get_uclass_priv(dev);
+	struct stdio_dev *sdev = &uc_priv->sdev;
+	struct input_config *input = &uc_priv->input;
+	int ret;
+
+	input_set_delays(input, KBC_REPEAT_DELAY_MS, KBC_REPEAT_RATE_MS);
+
+	input->dev = dev;
+	input->read_keys = tegra_nvec_kbc_check;
+	input_add_tables(input, false);
+	strcpy(sdev->name, "tegra-nvec-kbc");
+	ret = input_stdio_register(sdev);
+	if (ret) {
+		debug("%s: input_stdio_register() failed\n", __func__);
+		return ret;
+	}
+
+	return -EINVAL;
+}
+
+static const struct keyboard_ops tegra_nvec_kbd_ops = {
+	.start	= tegra_nvec_kbd_start,
+};
+
+static const struct udevice_id tegra_nvec_kbd_ids[] = {
+	{ .compatible = "nvidia,tegra20-nvec-kbc" },
+	{ }
+};
+
+U_BOOT_DRIVER(tegra_kbd) = {
+	.name	= "tegra_nvec_kbd",
+	.id	= UCLASS_KEYBOARD,
+	.of_match = tegra_nvec_kbd_ids,
+	.probe = tegra_nvec_kbd_probe,
+	.ops	= &tegra_nvec_kbd_ops,
+};

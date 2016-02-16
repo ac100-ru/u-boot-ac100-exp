@@ -68,7 +68,7 @@ enum {
 };
 
 struct nvec_t {
-	int gpio;
+	struct gpio_desc request_gpio;
 	int i2c_addr;
 	int i2c_clk;
 	void __iomem *base;
@@ -85,7 +85,7 @@ struct fdt_nvec_config {
 	int i2c_addr;
 	int i2c_clk;
 	fdt_addr_t base_addr;
-	struct fdt_gpio_state request_gpio;
+	struct gpio_desc request_gpio;
 };
 
 
@@ -221,7 +221,7 @@ int nvec_do_io(struct nvec_t *nvec, int wait_for_ec)
 				}
 				to_send = nvec->tx_size;
 				writel(to_send, nvec->base + I2C_SL_RCVD);
-				gpio_set_value(nvec_data.gpio, 1);
+				dm_gpio_set_value(&nvec_data.request_gpio, 1);
 				nvec->state = NVST_WRITE;
 			} else {
 				nvec->state = NVST_READ;
@@ -297,7 +297,7 @@ int nvec_do_request(char *buf, int size)
 		nvec_data.tx_pos = 0;
 
 		/* request */
-		gpio_set_value(nvec_data.gpio, 0);
+		dm_gpio_set_value(&nvec_data.request_gpio, 0);
 		res = nvec_do_io(&nvec_data, NVEC_WAIT_FOR_EC);
 		if (res != nvec_io_write_ok) {
 			debug("warning: nvec failed to send request\n");
@@ -376,8 +376,8 @@ static int nvec_decode_config(const void *blob,
 		return -1;
 	}
 
-	if (fdtdec_decode_gpio(blob, node, "request-gpios",
-			       &config->request_gpio)) {
+	if (gpio_request_by_name_nodev(blob, node, "request-gpios", 0,
+				   &config->request_gpio, GPIOD_IS_OUT)) {
 		error("No NVEC request gpio\n");
 		return -1;
 	}
@@ -405,20 +405,17 @@ int board_nvec_init(void)
 	nvec_data.tx_size = 0;
 	nvec_data.state = NVST_BEGIN;
 
-	nvec_data.gpio = cfg.request_gpio.gpio;
+	nvec_data.request_gpio = cfg.request_gpio;
 	nvec_data.i2c_addr = cfg.i2c_addr;
 	nvec_data.i2c_clk = cfg.i2c_clk;
 	nvec_data.base = (void __iomem *)cfg.base_addr;
 
 	debug("NVEC initialization...\n");
 
-	res = gpio_request(nvec_data.gpio, NULL);
+	res = dm_gpio_request(&nvec_data.request_gpio, NULL);
 	if (res != 0)
 		error("NVEC: err, gpio_request\n");
-	res = gpio_direction_output(nvec_data.gpio, 1);
-	if (res != 0)
-		error("NVEC: err, gpio_direction\n");
-	res = gpio_set_value(nvec_data.gpio, 1);
+	res = dm_gpio_set_value(&nvec_data.request_gpio, 1);
 	if (res != 0)
 		error("NVEC: err, gpio_set_value\n");
 	udelay(100);
