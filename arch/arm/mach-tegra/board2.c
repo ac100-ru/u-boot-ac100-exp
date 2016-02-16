@@ -42,6 +42,9 @@
 #include <asm/arch-tegra/tegra_mmc.h>
 #include <asm/arch-tegra/mmc.h>
 #endif
+#ifdef CONFIG_TEGRA_NVEC
+#include <asm/arch-tegra/tegra_nvec.h>
+#endif
 #include <asm/arch-tegra/xusb-padctl.h>
 #include <power/as3722.h>
 #include <i2c.h>
@@ -236,6 +239,11 @@ int board_late_init(void)
 	}
 #endif
 	start_cpu_fan();
+
+#ifdef CONFIG_TEGRA_NVEC
+	if (board_nvec_init())
+		debug("NVEC controller init failed\n");
+#endif
 
 	return 0;
 }
