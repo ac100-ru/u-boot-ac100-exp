@@ -869,7 +869,7 @@
 		compatible = "nvidia,tegra20-nvec";
 		reg = <0x7000c500 0x100>;
 		clock-frequency = <80000>;
-		request-gpios = <&gpio 170 0>; /* gpio PV2 */
+		request-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_LOW>;
 		slave-addr = <138>;
 	};
 };
