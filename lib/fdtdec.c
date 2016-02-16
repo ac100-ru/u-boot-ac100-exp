@@ -32,6 +32,7 @@ static const char * const compat_names[COMPAT_COUNT] = {
 	COMPAT(NVIDIA_TEGRA20_EMC, "nvidia,tegra20-emc"),
 	COMPAT(NVIDIA_TEGRA20_EMC_TABLE, "nvidia,tegra20-emc-table"),
 	COMPAT(NVIDIA_TEGRA20_NAND, "nvidia,tegra20-nand"),
+	COMPAT(NVIDIA_TEGRA20_NVEC, "nvidia,tegra20-nvec"),
 	COMPAT(NVIDIA_TEGRA124_PMC, "nvidia,tegra124-pmc"),
 	COMPAT(NVIDIA_TEGRA186_SDMMC, "nvidia,tegra186-sdhci"),
 	COMPAT(NVIDIA_TEGRA210_SDMMC, "nvidia,tegra210-sdhci"),
