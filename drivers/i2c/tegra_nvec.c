@@ -372,7 +372,6 @@ static void nvec_init_i2c_slave(struct nvec_t *nvec)
 }
 
 
-#if 0
 /**
  * Decode the nvec information from the fdt.
  *
@@ -380,41 +379,37 @@ static void nvec_init_i2c_slave(struct nvec_t *nvec)
  * @param config	structure to store fdt config into
  * @return 0 if ok, -ve on error
  */
-static int nvec_decode_config(const void *blob,
-			      struct fdt_nvec_config *config)
+static int nvec_decode_fdt(const void *blob, int node,
+			      struct nvec_t *nvec)
 {
-	int node;
+	int ret;
 
-	node = fdtdec_next_compatible(blob, 0, COMPAT_NVIDIA_TEGRA20_NVEC);
-	if (node < 0) {
-		error("Cannot find NVEC node in fdt");
-		return node;
+	ret = gpio_request_by_name_nodev(blob, node, "request-gpios", 0,
+				   &nvec->request_gpio, GPIOD_IS_OUT);
+	if (ret < 0) {
+		error("Failed to get request-gpios (%d)", ret);
+		return -ENOENT;
 	}
 
-	config->base_addr = fdtdec_get_addr(blob, node, "reg");
-	if (config->base_addr == FDT_ADDR_T_NONE) {
+	nvec->base = (void __iomem *)fdtdec_get_addr(blob, node, "reg");
+	if (nvec->base == (void __iomem *)FDT_ADDR_T_NONE) {
 		error("No NVEC controller address");
-		return -1;
+		return -ENOENT;
 	}
-
-	if (gpio_request_by_name_nodev(blob, node, "request-gpios", 0,
-				   &config->request_gpio, GPIOD_IS_OUT)) {
-		error("No NVEC request gpio");
-		return -1;
-	}
-
-	config->i2c_addr = fdtdec_get_int(blob, node, "slave-addr", -1);
-	config->i2c_clk = fdtdec_get_int(blob, node, "clock-frequency", -1);
+	nvec->i2c_addr = fdtdec_get_int(blob, node, "slave-addr", -1);
+	nvec->i2c_clk = fdtdec_get_int(blob, node, "clock-frequency", -1);
 
 	return 0;
 }
-#endif /* 0 */
 
-static int nvec_probe(struct udevice *dev, uint chip, uint chip_flags)
+static int nvec_probe(struct udevice *dev)
 {
 	struct nvec_t *nvec = dev_get_priv(dev);
-	nvec_data = nvec;
+	const void *blob = gd->fdt_blob;
+	int node = dev->of_offset;
 	int res;
+
+	nvec_data = nvec;
 
 	nvec_data->rx_pos = 0;
 	nvec_data->tx_buf = 0;
@@ -423,6 +418,11 @@ static int nvec_probe(struct udevice *dev, uint chip, uint chip_flags)
 	nvec_data->state = NVST_BEGIN;
 
 	debug("NVEC initialization...\n");
+
+	if (nvec_decode_fdt(blob, node, nvec_data)) {
+		error("Failed to decode fdt");
+		return -EBUSY;
+	}
 
 	res = dm_gpio_request(&nvec_data->request_gpio, NULL);
 	if (res != 0)
@@ -470,36 +470,20 @@ int nvec_read_events(void)
 	return 0;
 }
 
-static int nvec_ofdata_to_platdata(struct udevice *dev)
+static int nvec_set_bus_speed(struct udevice *dev, unsigned int speed)
 {
-	struct nvec_t *nvec = dev_get_priv(dev);
-	const void *blob = gd->fdt_blob;
-	int node = dev->of_offset;
-	int ret;
-
-	ret = gpio_request_by_name_nodev(blob, node, "request-gpios", 0,
-				   &nvec->request_gpio, GPIOD_IS_OUT);
-	if (ret < 0)
-		goto error;
-
-	nvec->base = (void __iomem *)fdtdec_get_addr(blob, node, "reg");
-	if (nvec->base == (void __iomem *)FDT_ADDR_T_NONE) {
-		error("No NVEC controller address");
-		ret = -ENOENT;
-		goto error;
-	}
-	nvec->i2c_addr = fdtdec_get_int(blob, node, "slave-addr", -1);
-	nvec->i2c_clk = fdtdec_get_int(blob, node, "clock-frequency", -1);
-
 	return 0;
-error:
-	error("Can't get %s gpios! Error: %d", dev->name, ret);
-	return ret;
 }
 
+static int nvec_xfer(struct udevice *dev, struct i2c_msg *msg,
+			    int nmsgs)
+{
+	return 0;
+}
 
 static const struct dm_i2c_ops i2c_nvec_ops = {
-	.probe_chip	= nvec_probe,
+	.xfer		= nvec_xfer,
+	.set_bus_speed	= nvec_set_bus_speed,
 };
 
 static const struct udevice_id i2c_nvec_ids[] = {
@@ -507,11 +491,11 @@ static const struct udevice_id i2c_nvec_ids[] = {
 	{ }
 };
 
-U_BOOT_DRIVER(i2c_gpio) = {
+U_BOOT_DRIVER(nvec) = {
 	.name	= "nvec",
 	.id	= UCLASS_I2C,
 	.of_match = i2c_nvec_ids,
-	.ofdata_to_platdata = nvec_ofdata_to_platdata,
+	.probe	= nvec_probe,
 	.priv_auto_alloc_size = sizeof(struct nvec_t),
 	.ops	= &i2c_nvec_ops,
 };
