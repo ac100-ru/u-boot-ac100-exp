@@ -24,7 +24,9 @@
 #define DEBUG 1
 
 #include <common.h>
-#include <fdtdec.h>
+#include <errno.h>
+#include <dm.h>
+#include <i2c.h>
 #include <asm/io.h>
 #include <asm/gpio.h>
 #include <asm/arch/clock.h>
@@ -80,8 +82,9 @@ struct nvec_t {
 	char *tx_buf;
 	int tx_pos;
 	int tx_size;
-} nvec_data;
+} *nvec_data;
 
+#if 0
 struct fdt_nvec_config {
 	int gpio;
 	int i2c_addr;
@@ -89,6 +92,7 @@ struct fdt_nvec_config {
 	fdt_addr_t base_addr;
 	struct gpio_desc request_gpio;
 };
+#endif
 
 
 /* nvec commands */
@@ -164,6 +168,9 @@ int nvec_do_io(struct nvec_t *nvec, int wait_for_ec)
 	unsigned int timeout_ms = NVEC_TIMEOUT_MAX;
 	int is_first_iteration = 1;
 
+	if (!nvec_data)
+		return nvec_io_not_ready;
+
 	poll_start_ms = get_timer(0);
 	mdelay(NVEC_TIMEOUT_MIN);
 
@@ -223,7 +230,7 @@ int nvec_do_io(struct nvec_t *nvec, int wait_for_ec)
 				}
 				to_send = nvec->tx_size;
 				writel(to_send, nvec->base + I2C_SL_RCVD);
-				if (dm_gpio_set_value(&nvec_data.request_gpio, 1))
+				if (dm_gpio_set_value(&nvec_data->request_gpio, 1))
 					error("NVEC io: failed to set gpio value to 1");
 				nvec->state = NVST_WRITE;
 			} else {
@@ -296,19 +303,19 @@ int nvec_do_request(char *buf, int size)
 	int recv_failed = 0;
 	int gpio_failed = 0;
 
-	nvec_data.tx_buf = buf;
-	nvec_data.tx_size = size;
+	nvec_data->tx_buf = buf;
+	nvec_data->tx_size = size;
 
 	while (i++ < NVEC_ATTEMPTS_MAX) {
-		nvec_data.tx_pos = 0;
+		nvec_data->tx_pos = 0;
 
 		/* request */
-		if (dm_gpio_set_value(&nvec_data.request_gpio, 0)) {
+		if (dm_gpio_set_value(&nvec_data->request_gpio, 0)) {
 			++gpio_failed;
 			error("NVEC io: failed to set gpio value to 0");
 		}
 
-		res = nvec_do_io(&nvec_data, NVEC_WAIT_FOR_EC);
+		res = nvec_do_io(nvec_data, NVEC_WAIT_FOR_EC);
 		if (res != nvec_io_write_ok) {
 			++send_failed;
 			debug("warning: nvec failed to send request\n");
@@ -316,16 +323,16 @@ int nvec_do_request(char *buf, int size)
 		}
 
 		/* response */
-		res = nvec_do_io(&nvec_data, NVEC_WAIT_FOR_EC);
+		res = nvec_do_io(nvec_data, NVEC_WAIT_FOR_EC);
 		if (res != nvec_io_read_ok) {
 			++recv_failed;
 			debug("warning: nvec failed to read response\n");
 			continue;
 		}
 
-		nvec_data.tx_buf = 0;
-		nvec_data.tx_size = 0;
-		nvec_data.tx_pos = 0;
+		nvec_data->tx_buf = 0;
+		nvec_data->tx_size = 0;
+		nvec_data->tx_pos = 0;
 
 		return 0;
 	}
@@ -365,6 +372,7 @@ static void nvec_init_i2c_slave(struct nvec_t *nvec)
 }
 
 
+#if 0
 /**
  * Decode the nvec information from the fdt.
  *
@@ -400,40 +408,31 @@ static int nvec_decode_config(const void *blob,
 
 	return 0;
 }
+#endif /* 0 */
 
-
-int board_nvec_init(void)
+static int nvec_probe(struct udevice *dev, uint chip, uint chip_flags)
 {
-	int res = 0;
+	struct nvec_t *nvec = dev_get_priv(dev);
+	nvec_data = nvec;
+	int res;
 
-	struct fdt_nvec_config cfg;
-	if (nvec_decode_config(gd->fdt_blob, &cfg)) {
-		debug("Can't parse NVEC node in device tree\n");
-		return -1;
-	}
-
-	nvec_data.rx_pos = 0;
-	nvec_data.tx_buf = 0;
-	nvec_data.tx_pos = 0;
-	nvec_data.tx_size = 0;
-	nvec_data.state = NVST_BEGIN;
-
-	nvec_data.request_gpio = cfg.request_gpio;
-	nvec_data.i2c_addr = cfg.i2c_addr;
-	nvec_data.i2c_clk = cfg.i2c_clk;
-	nvec_data.base = (void __iomem *)cfg.base_addr;
+	nvec_data->rx_pos = 0;
+	nvec_data->tx_buf = 0;
+	nvec_data->tx_pos = 0;
+	nvec_data->tx_size = 0;
+	nvec_data->state = NVST_BEGIN;
 
 	debug("NVEC initialization...\n");
 
-	res = dm_gpio_request(&nvec_data.request_gpio, NULL);
+	res = dm_gpio_request(&nvec_data->request_gpio, NULL);
 	if (res != 0)
 		error("NVEC: err, gpio_request (%d)", res);
-	res = dm_gpio_set_value(&nvec_data.request_gpio, 1);
+	res = dm_gpio_set_value(&nvec_data->request_gpio, 1);
 	if (res != 0)
 		error("NVEC: err, dm_gpio_set_value (%d)", res);
 	udelay(100);
 
-	nvec_init_i2c_slave(&nvec_data);
+	nvec_init_i2c_slave(nvec_data);
 
 	nvec_enable_kbd_events();
 
@@ -447,7 +446,7 @@ int nvec_read_events(void)
 	int cnt = 0;
 
 	while (++cnt <= 8) {
-		res = nvec_do_io(&nvec_data, NVEC_DONT_WAIT_FOR_EC);
+		res = nvec_do_io(nvec_data, NVEC_DONT_WAIT_FOR_EC);
 		switch (res) {
 		case nvec_io_not_ready:
 			return 0;
@@ -470,3 +469,49 @@ int nvec_read_events(void)
 
 	return 0;
 }
+
+static int nvec_ofdata_to_platdata(struct udevice *dev)
+{
+	struct nvec_t *nvec = dev_get_priv(dev);
+	const void *blob = gd->fdt_blob;
+	int node = dev->of_offset;
+	int ret;
+
+	ret = gpio_request_by_name_nodev(blob, node, "request-gpios", 0,
+				   &nvec->request_gpio, GPIOD_IS_OUT);
+	if (ret < 0)
+		goto error;
+
+	nvec->base = (void __iomem *)fdtdec_get_addr(blob, node, "reg");
+	if (nvec->base == (void __iomem *)FDT_ADDR_T_NONE) {
+		error("No NVEC controller address");
+		ret = -ENOENT;
+		goto error;
+	}
+	nvec->i2c_addr = fdtdec_get_int(blob, node, "slave-addr", -1);
+	nvec->i2c_clk = fdtdec_get_int(blob, node, "clock-frequency", -1);
+
+	return 0;
+error:
+	error("Can't get %s gpios! Error: %d", dev->name, ret);
+	return ret;
+}
+
+
+static const struct dm_i2c_ops i2c_nvec_ops = {
+	.probe_chip	= nvec_probe,
+};
+
+static const struct udevice_id i2c_nvec_ids[] = {
+	{ .compatible = "nvidia,tegra20-nvec" },
+	{ }
+};
+
+U_BOOT_DRIVER(i2c_gpio) = {
+	.name	= "nvec",
+	.id	= UCLASS_I2C,
+	.of_match = i2c_nvec_ids,
+	.ofdata_to_platdata = nvec_ofdata_to_platdata,
+	.priv_auto_alloc_size = sizeof(struct nvec_t),
+	.ops	= &i2c_nvec_ops,
+};
