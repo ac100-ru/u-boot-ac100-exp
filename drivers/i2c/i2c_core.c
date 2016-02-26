@@ -7,6 +7,8 @@
  *
  * Multibus/multiadapter I2C core functions (wrappers)
  */
+#define DEBUG
+
 #include <common.h>
 #include <i2c.h>
 
