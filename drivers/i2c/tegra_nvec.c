@@ -481,8 +481,20 @@ static int nvec_xfer(struct udevice *dev, struct i2c_msg *msg,
 	return 0;
 }
 
+/* Probe to see if a chip is present. */
+static int nvec_probe_chip(struct udevice *bus, uint chip_addr,
+				uint chip_flags)
+{
+	/* Shift 7-bit address over for lower-level i2c functions */
+	/*rc = tegra_i2c_write_data(i2c_bus, chip_addr << 1, &reg, sizeof(reg),
+				  false);*/
+
+	return 0;
+}
+
 static const struct dm_i2c_ops i2c_nvec_ops = {
 	.xfer		= nvec_xfer,
+	.probe_chip	= nvec_probe_chip,
 	.set_bus_speed	= nvec_set_bus_speed,
 };
 
@@ -491,8 +503,8 @@ static const struct udevice_id i2c_nvec_ids[] = {
 	{ }
 };
 
-U_BOOT_DRIVER(nvec) = {
-	.name	= "nvec",
+U_BOOT_DRIVER(i2c_nvec) = {
+	.name	= "i2c-nvec",
 	.id	= UCLASS_I2C,
 	.of_match = i2c_nvec_ids,
 	.probe	= nvec_probe,
