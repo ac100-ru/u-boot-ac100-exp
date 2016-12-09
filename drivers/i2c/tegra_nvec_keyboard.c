@@ -21,12 +21,16 @@
  * MA 02111-1307 USA
  */
 
+//#error TEGRA NVEC KEYBOARD DRIVER
+
 #include <common.h>
 #include <circbuf.h>
 #include <asm/arch-tegra/tegra_nvec_keyboard.h>
 #include <asm/arch-tegra/tegra_nvec_keytable.h>
 #include <asm/arch-tegra/tegra_nvec.h>
 
+
+#define TRACE() error("%s\n", __func__)
 
 circbuf_t key_buf = { 0, 0, NULL, NULL, NULL, NULL };
 
@@ -95,6 +99,7 @@ void nvec_process_keyboard_msg(const unsigned char *msg)
 
 void nvec_enable_kbd_events(void)
 {
+	TRACE();
 	buf_init(&key_buf, NVEC_KEYS_QUEUE_SIZE * sizeof(int));
 
 	if (nvec_do_request(reset_kbd, 4))
