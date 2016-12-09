@@ -475,6 +475,18 @@ config SYS_I2C_IHS
         help
           Support for gdsys IHS I2C driver on FPGA bus.
 
+config TEGRA_I2C
+       bool "Enable Tegra 2 I2C driver"
+       depends on DM_I2C
+       help
+         Support for Tegra 2 I2C controller.
+
+config TEGRA_NVEC
+       bool "Enable Tegra 2 NVEC keyboard drived"
+       depends on TEGRA_I2C
+       help
+         Support for Tegra 2 I2C NVEC keyboard.
+
 source "drivers/i2c/muxes/Kconfig"
 
 endmenu

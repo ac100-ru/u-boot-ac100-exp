@@ -24,3 +24,9 @@ config I8042_KEYB
 	  driver handles English and German keyboards - set the environment
 	  variable 'keymap' to "de" to select German. Keyboard repeat is
 	  handled by the keyboard itself.
+
+config TEGRA_NVEC_KEYBOARD
+	bool "Enable NVEC keyboard"
+	depends on TEGRA_NVEC
+	help
+	  This adds NVEC keyboard driver.
