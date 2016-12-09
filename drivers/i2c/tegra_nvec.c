@@ -21,6 +21,8 @@
  * MA 02111-1307 USA
  */
 
+//#error TEGRA NVEC DRIVER
+
 #define DEBUG 1
 
 #include <common.h>
@@ -39,7 +41,7 @@
 #endif
 
 DECLARE_GLOBAL_DATA_PTR;
-
+#define TRACE() error("%s\n", __func__)
 
 /* Nvec perfroms io interval is beteween 20 and 500 ms,
 no response in 600 ms means error */
@@ -409,6 +411,7 @@ static int nvec_probe(struct udevice *dev)
 	int node = dev->of_offset;
 	int res;
 
+	TRACE();
 	nvec_data = nvec;
 
 	nvec_data->rx_pos = 0;
@@ -472,12 +475,14 @@ int nvec_read_events(void)
 
 static int nvec_set_bus_speed(struct udevice *dev, unsigned int speed)
 {
+	TRACE();
 	return 0;
 }
 
 static int nvec_xfer(struct udevice *dev, struct i2c_msg *msg,
 			    int nmsgs)
 {
+	TRACE();
 	return 0;
 }
 
@@ -488,6 +493,7 @@ static int nvec_probe_chip(struct udevice *bus, uint chip_addr,
 	/* Shift 7-bit address over for lower-level i2c functions */
 	/*rc = tegra_i2c_write_data(i2c_bus, chip_addr << 1, &reg, sizeof(reg),
 				  false);*/
+	TRACE();
 
 	return 0;
 }

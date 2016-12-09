@@ -871,5 +871,12 @@
 		clock-frequency = <80000>;
 		request-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_LOW>;
 		slave-addr = <138>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		kbc@0x1 {
+			reg = <0x0 0x0>;
+			compatible = "nvidia,tegra20-nvec-kbc";
+		};
 	};
 };
