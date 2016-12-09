@@ -22,6 +22,8 @@
  * MA 02111-1307 USA
  */
 
+//#error TEGRA NVEC KBC
+
 #include <common.h>
 #include <dm.h>
 #include <input.h>
@@ -30,6 +32,8 @@
 #include <asm/arch-tegra/tegra_nvec_events.h>
 #include <asm/arch-tegra/tegra_nvec_keyboard.h>
 #include <linux/input.h>
+
+#define TRACE() error("%s\n", __func__)
 
 enum {
 	KBC_MAX_KPENT = 8,
@@ -103,6 +107,7 @@ static int tegra_nvec_kbd_probe(struct udevice *dev)
 	struct input_config *input = &uc_priv->input;
 	int ret;
 
+	TRACE();
 	input_set_delays(input, KBC_REPEAT_DELAY_MS, KBC_REPEAT_RATE_MS);
 
 	input->dev = dev;
