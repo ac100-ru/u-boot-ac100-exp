@@ -181,6 +181,18 @@ config TEGRA186_BPMP_I2C
 	  by the BPMP, and can only be accessed by the main CPU via IPC
 	  requests to the BPMP. This driver covers the latter case.
 
+config TEGRA_I2C
+	bool "Enable Tegra 2 I2C driver"
+	depends on DM_I2C
+	help
+	  Support for Tegra 2 I2C controller.
+
+config TEGRA_NVEC
+	bool "Enable Tegra 2 NVEC keyboard drived"
+	depends on TEGRA_I2C
+	help
+	  Support for Tegra 2 I2C NVEC keyboard.
+
 source "drivers/i2c/muxes/Kconfig"
 
 endmenu
