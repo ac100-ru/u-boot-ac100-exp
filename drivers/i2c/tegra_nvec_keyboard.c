@@ -30,7 +30,7 @@
 #include <asm/arch-tegra/tegra_nvec.h>
 
 
-#define TRACE() error("%s\n", __func__)
+#define TRACE() debug("nvec keyboard: %s\n", __func__)
 
 circbuf_t key_buf = { 0, 0, NULL, NULL, NULL, NULL };
 
