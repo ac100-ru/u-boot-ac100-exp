@@ -445,7 +445,7 @@ static int nvec_probe(struct udevice *dev)
 
 	// TODO: free gpios and memory
 
-	return 1;
+	return 0;
 }
 
 

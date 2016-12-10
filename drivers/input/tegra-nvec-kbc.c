@@ -24,6 +24,8 @@
 
 //#error TEGRA NVEC KBC
 
+#define DEBUG 1
+
 #include <common.h>
 #include <dm.h>
 #include <input.h>
@@ -33,7 +35,7 @@
 #include <asm/arch-tegra/tegra_nvec_keyboard.h>
 #include <linux/input.h>
 
-#define TRACE() error("%s\n", __func__)
+#define TRACE() debug("%s\n", __func__)
 
 enum {
 	KBC_MAX_KPENT = 8,
@@ -120,7 +122,9 @@ static int tegra_nvec_kbd_probe(struct udevice *dev)
 		return ret;
 	}
 
-	return -EINVAL;
+	debug("tegra kbc is initialized\n");
+	//return -EINVAL;
+	return 0;
 }
 
 static const struct keyboard_ops tegra_nvec_kbd_ops = {
