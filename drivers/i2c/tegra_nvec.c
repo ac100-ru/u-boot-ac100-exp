@@ -41,7 +41,10 @@
 #endif
 
 DECLARE_GLOBAL_DATA_PTR;
-#define TRACE() error("%s\n", __func__)
+#define TRACE() debug("nvec: %s\n", __func__)
+
+#define GPIO_ACTIVE 1
+#define GPIO_INACTIVE 0
 
 /* Nvec perfroms io interval is beteween 20 and 500 ms,
 no response in 600 ms means error */
@@ -232,8 +235,8 @@ int nvec_do_io(struct nvec_t *nvec, int wait_for_ec)
 				}
 				to_send = nvec->tx_size;
 				writel(to_send, nvec->base + I2C_SL_RCVD);
-				if (dm_gpio_set_value(&nvec_data->request_gpio, 1))
-					error("NVEC io: failed to set gpio value to 1");
+				if (dm_gpio_set_value(&nvec_data->request_gpio, GPIO_INACTIVE))
+					error("NVEC io: failed to set gpio value to INACTIVE");
 				nvec->state = NVST_WRITE;
 			} else {
 				nvec->state = NVST_READ;
@@ -312,9 +315,9 @@ int nvec_do_request(char *buf, int size)
 		nvec_data->tx_pos = 0;
 
 		/* request */
-		if (dm_gpio_set_value(&nvec_data->request_gpio, 0)) {
+		if (dm_gpio_set_value(&nvec_data->request_gpio, GPIO_ACTIVE)) {
 			++gpio_failed;
-			error("NVEC io: failed to set gpio value to 0");
+			error("NVEC io: failed to set gpio value to ACTIVE");
 		}
 
 		res = nvec_do_io(nvec_data, NVEC_WAIT_FOR_EC);
@@ -384,14 +387,14 @@ static void nvec_init_i2c_slave(struct nvec_t *nvec)
 static int nvec_decode_fdt(const void *blob, int node,
 			      struct nvec_t *nvec)
 {
-	int ret;
+//	int ret;
 
-	ret = gpio_request_by_name_nodev(blob, node, "request-gpios", 0,
-				   &nvec->request_gpio, GPIOD_IS_OUT);
-	if (ret < 0) {
-		error("Failed to get request-gpios (%d)", ret);
-		return -ENOENT;
-	}
+//	ret = gpio_request_by_name_nodev(blob, node, "request-gpios", 0,
+//				   &nvec->request_gpio, GPIOD_IS_OUT);
+//	if (ret < 0) {
+//		error("Failed to get request-gpios (%d)", ret);
+//		return -ENOENT;
+//	}
 
 	nvec->base = (void __iomem *)fdtdec_get_addr(blob, node, "reg");
 	if (nvec->base == (void __iomem *)FDT_ADDR_T_NONE) {
@@ -427,17 +430,20 @@ static int nvec_probe(struct udevice *dev)
 		return -EBUSY;
 	}
 
-	res = dm_gpio_request(&nvec_data->request_gpio, NULL);
+	res = gpio_request_by_name(dev, "request-gpios", 0, &nvec_data->request_gpio, GPIOD_IS_OUT);
 	if (res != 0)
 		error("NVEC: err, gpio_request (%d)", res);
-	res = dm_gpio_set_value(&nvec_data->request_gpio, 1);
+	debug("request-gpios flags: 0x%lx\n", nvec_data->request_gpio.flags);
+	res = dm_gpio_set_value(&nvec_data->request_gpio, GPIO_INACTIVE);
 	if (res != 0)
-		error("NVEC: err, dm_gpio_set_value (%d)", res);
+		error("NVEC: err, dm_gpio_set_value to INACTIVE error (%d)", res);
 	udelay(100);
 
 	nvec_init_i2c_slave(nvec_data);
 
 	nvec_enable_kbd_events();
+
+	// TODO: free gpios and memory
 
 	return 1;
 }
