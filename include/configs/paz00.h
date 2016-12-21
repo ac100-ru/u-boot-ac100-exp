@@ -59,6 +59,7 @@
 	"i2c dev 1" "\0" \
 	"i2c dev 2" "\0"
 
+#include "tegra-common-usb-gadget.h"
 #include "tegra-common-post.h"
 
 #endif /* __CONFIG_H */
