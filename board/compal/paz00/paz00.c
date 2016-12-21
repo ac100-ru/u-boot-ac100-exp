@@ -9,8 +9,10 @@
 
 #include <common.h>
 #include <asm/io.h>
-#include <asm/arch/tegra.h>
+#include <asm/arch/clock.h>
+#include <asm/arch/funcmux.h>
 #include <asm/arch/pinmux.h>
+#include <asm/arch/tegra.h>
 #include <asm/gpio.h>
 
 #ifdef CONFIG_TEGRA_MMC
@@ -38,6 +40,24 @@ void pin_mux_mmc(void)
 	pinmux_tristate_disable(PMUX_PINGRP_UAC);
 	/* For CD GPIO PV5 */
 	pinmux_tristate_disable(PMUX_PINGRP_GPV);
+}
+#endif
+
+#ifdef CONFIG_USB_EHCI_TEGRA
+void pin_mux_usb(void)
+{
+	/* For USB1's ULPI signals */
+	funcmux_select(PERIPH_ID_USB2, FUNCMUX_USB2_ULPI);
+
+	/* ULPI reference clock output */
+	pinmux_set_func(PMUX_PINGRP_CDEV2, PMUX_FUNC_PLLP_OUT4);
+	pinmux_tristate_disable(PMUX_PINGRP_CDEV2);
+
+	/* USB1 PHY reset GPIO */
+	gpio_request(TEGRA_GPIO(V, 0), "ulpi_phy_reset");
+	gpio_direction_output(TEGRA_GPIO(V, 0), 0);
+	udelay(5);
+	gpio_set_value(TEGRA_GPIO(V, 0), 1);
 }
 #endif
 
