@@ -237,8 +237,8 @@
  * of the Gadget, USB Mass Storage, and SCSI protocols.
  */
 
-/* #define VERBOSE_DEBUG */
-/* #define DUMP_MSGS */
+#define VERBOSE_DEBUG
+#define DUMP_MSGS
 
 #include <config.h>
 #include <malloc.h>
