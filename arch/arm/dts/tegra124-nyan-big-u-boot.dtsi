@@ -4,8 +4,6 @@
  * Written by Simon Glass <sjg@chromium.org>
  */
 
-#include "tegra-u-boot.dtsi"
-
 / {
 	host1x@50000000 {
 		u-boot,dm-pre-reloc;
