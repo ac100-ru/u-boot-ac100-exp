@@ -31,6 +31,7 @@
 
 
 #define TRACE() debug("nvec keyboard: %s\n", __func__)
+#define error(fmt, args...) printf(pr_fmt(fmt), ##args)
 
 circbuf_t key_buf = { 0, 0, NULL, NULL, NULL, NULL };
 

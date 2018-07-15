@@ -42,6 +42,8 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 #define TRACE() debug("nvec: %s\n", __func__)
+//#define error(fmt, args...) log(LOG_CATEGORY, LOGL_ERROR, fmt, ##args);
+#define error(fmt, args...) printf(pr_fmt(fmt), ##args)
 
 #define GPIO_ACTIVE 1
 #define GPIO_INACTIVE 0
@@ -411,7 +413,7 @@ static int nvec_probe(struct udevice *dev)
 {
 	struct nvec_t *nvec = dev_get_priv(dev);
 	const void *blob = gd->fdt_blob;
-	int node = dev->of_offset;
+	int node = dev->node.of_offset;
 	int res;
 
 	TRACE();
